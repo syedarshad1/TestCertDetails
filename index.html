@@ -4,29 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Search Application</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>Search Application</h1>
-    <label for="fieldName">Field Name:</label>
-    <select id="fieldName">
-        <option value="IssuedCN">IssuedCN</option>
-        <option value="EffectiveDate">EffectiveDate</option>
-        <option value="ExpirationDate">ExpirationDate</option>
-        <option value="OwnedBy">OwnedBy</option>
-    </select>
-    <br>
-    <label for="comparison">Comparison:</label>
-    <select id="comparison">
-        <option value="contains">Contains</option>
-        <option value="doesNotContain">Does Not Contain</option>
-        <option value="isEqualTo">Is Equal To</option>
-        <option value="isNotEqualTo">Is Not Equal To</option>
-    </select>
-    <br>
-    <label for="searchInput">Value:</label>
-    <input type="text" id="searchInput" name="searchInput">
-    <button onclick="search()">Search</button>
-    <div id="result"></div>
+    <div class="container">
+        <h1>Search Application</h1>
+        <div class="search-bar">
+            <label for="fieldName">Field Name:</label>
+            <input type="text" id="fieldName" name="fieldName">
+            
+            <label for="comparison">Comparison:</label>
+            <select id="comparison" name="comparison">
+                <option value="contains">Contains</option>
+                <option value="equals">Equals</option>
+            </select>
+            
+            <label for="searchInput">Value:</label>
+            <input type="text" id="searchInput" name="searchInput">
+            
+            <button onclick="search()">Search</button>
+        </div>
+        <div id="result"></div>
+    </div>
 
     <script src="script.js"></script>
 </body>
