@@ -11,12 +11,19 @@
         <h1>Search Application</h1>
         <div class="search-bar">
             <label for="fieldName">Field Name:</label>
-            <input type="text" id="fieldName" name="fieldName">
+            <select id="fieldName" name="fieldName">
+                <option value="IssuedCN">IssuedCN</option>
+                <option value="EffectiveDate">EffectiveDate</option>
+                <option value="ExpirationDate">ExpirationDate</option>
+                <option value="OwnedBy">OwnedBy</option>
+            </select>
             
             <label for="comparison">Comparison:</label>
             <select id="comparison" name="comparison">
                 <option value="contains">Contains</option>
-                <option value="equals">Equals</option>
+                <option value="does_not_contain">Does not contain</option>
+                <option value="equals">Is equal to</option>
+                <option value="not_equals">Is not equal to</option>
             </select>
             
             <label for="searchInput">Value:</label>
