@@ -7,9 +7,25 @@
 </head>
 <body>
     <h1>Search Application</h1>
-    <label for="searchInput">Search:</label>
+    <label for="fieldName">Field Name:</label>
+    <select id="fieldName">
+        <option value="IssuedCN">IssuedCN</option>
+        <option value="EffectiveDate">EffectiveDate</option>
+        <option value="ExpirationDate">ExpirationDate</option>
+        <option value="OwnedBy">OwnedBy</option>
+    </select>
+    <br>
+    <label for="comparison">Comparison:</label>
+    <select id="comparison">
+        <option value="contains">Contains</option>
+        <option value="doesNotContain">Does Not Contain</option>
+        <option value="isEqualTo">Is Equal To</option>
+        <option value="isNotEqualTo">Is Not Equal To</option>
+    </select>
+    <br>
+    <label for="searchInput">Value:</label>
     <input type="text" id="searchInput" name="searchInput">
-    <button onclick="search()">Submit</button>
+    <button onclick="search()">Search</button>
     <div id="result"></div>
 
     <script src="script.js"></script>
