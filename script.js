@@ -7,12 +7,12 @@ function search() {
     fetch('data.csv')
         .then(response => response.text())
         .then(data => {
-            const rows = data.split('\n');
-            const headers = rows[0].split(',');
+            const rows = data.split('\n').map(row => row.trim());
+            const headers = rows[0].split(',').map(header => header.trim());
             let results = [];
 
             rows.slice(1).forEach(row => {
-                const fields = row.split(',');
+                const fields = row.split(',').map(field => field.trim());
                 const fieldIndex = headers.indexOf(fieldName);
                 if (fieldIndex !== -1) {
                     const fieldValue = fields[fieldIndex].toLowerCase();
