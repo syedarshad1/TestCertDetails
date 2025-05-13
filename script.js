@@ -1,3 +1,40 @@
+async function fetchCertificates() {
+    const resultDiv = document.getElementById('result');
+
+    try {
+        const response = await axios.get('https://fis.keyfactorpki.com/KeyfactorAPI/Certificates', {
+            auth: {
+                username: 'your-username',
+                password: 'your-password'
+            },
+            params: {
+                includeExpired: true,
+                includeRevoked: true
+            }
+        });
+
+        let output = '<table><tr>';
+        const headers = Object.keys(response.data[0]);
+        headers.forEach(header => {
+            output += `<th>${header}</th>`;
+        });
+        output += '</tr>';
+
+        response.data.forEach(cert => {
+            output += '<tr>';
+            headers.forEach(header => {
+                output += `<td>${cert[header]}</td>`;
+            });
+            output += '</tr>';
+        });
+        output += '</table>';
+        resultDiv.innerHTML = output;
+    } catch (error) {
+        console.error('Error fetching certificates:', error);
+        resultDiv.innerHTML = 'Error occurred while fetching certificates';
+    }
+}
+
 function search() {
     const fieldName = document.getElementById('fieldName').value;
     const comparison = document.getElementById('comparison').value;
