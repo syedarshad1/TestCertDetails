@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Application</title>
+    <title>TestCertDetails</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
-        <h1>Certificate Repository</h1>
+        <h1>TestCertDetails</h1>
         <div class="search-bar">
             <label for="fieldName">Field Name:</label>
             <select id="fieldName" name="fieldName">
@@ -28,6 +28,7 @@
             
             <button onclick="search()">Search</button>
         </div>
+        <button onclick="fetchCertificates()">Fetch Certificates</button>
         <div id="result"></div>
     </div>
 
