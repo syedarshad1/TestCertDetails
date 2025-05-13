@@ -7,7 +7,7 @@ function search() {
     fetch('data.csv')
         .then(response => response.text())
         .then(data => {
-            const rows = data.split('\n').map(row => row.trim());
+            const rows = data.split('\n').map(row => row.trim()).filter(row => row.length > 0);
             const headers = rows[0].split(',').map(header => header.trim());
             let results = [];
 
