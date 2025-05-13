@@ -9,40 +9,38 @@ function search() {
         .then(data => {
             const rows = data.split('\n');
             const headers = rows[0].split(',');
-            const fieldIndex = headers.indexOf(fieldName);
-            let found = false;
-            let results = '';
+            let results = [];
 
             rows.slice(1).forEach(row => {
-                const columns = row.split(',');
-                const fieldValue = columns[fieldIndex];
-
-                let match = false;
-                switch (comparison) {
-                    case 'contains':
-                        match = fieldValue.includes(searchInput);
-                        break;
-                    case 'doesNotContain':
-                        match = !fieldValue.includes(searchInput);
-                        break;
-                    case 'isEqualTo':
-                        match = fieldValue === searchInput;
-                        break;
-                    case 'isNotEqualTo':
-                        match = fieldValue !== searchInput;
-                        break;
-                }
-
-                if (match) {
-                    results += `<p>Found: ${row}</p>`;
-                    found = true;
+                const fields = row.split(',');
+                const fieldIndex = headers.indexOf(fieldName);
+                if (fieldIndex !== -1) {
+                    const fieldValue = fields[fieldIndex];
+                    if ((comparison === 'contains' && fieldValue.includes(searchInput)) ||
+                        (comparison === 'equals' && fieldValue === searchInput)) {
+                        results.push(fields);
+                    }
                 }
             });
 
-            if (!found) {
-                resultDiv.innerHTML = 'No results found';
+            if (results.length > 0) {
+                let output = '<table><tr>';
+                headers.forEach(header => {
+                    output += `<th>${header}</th>`;
+                });
+                output += '</tr>';
+
+                results.forEach(result => {
+                    output += '<tr>';
+                    result.forEach(field => {
+                        output += `<td>${field}</td>`;
+                    });
+                    output += '</tr>';
+                });
+                output += '</table>';
+                resultDiv.innerHTML = output;
             } else {
-                resultDiv.innerHTML = results;
+                resultDiv.innerHTML = 'No results found';
             }
         })
         .catch(error => {
