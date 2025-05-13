@@ -16,8 +16,17 @@ function search() {
                 const fieldIndex = headers.indexOf(fieldName);
                 if (fieldIndex !== -1) {
                     const fieldValue = fields[fieldIndex];
-                    if ((comparison === 'contains' && fieldValue.includes(searchInput)) ||
-                        (comparison === 'equals' && fieldValue === searchInput)) {
+                    let match = false;
+                    if (comparison === 'contains' && fieldValue.includes(searchInput)) {
+                        match = true;
+                    } else if (comparison === 'does_not_contain' && !fieldValue.includes(searchInput)) {
+                        match = true;
+                    } else if (comparison === 'equals' && fieldValue === searchInput) {
+                        match = true;
+                    } else if (comparison === 'not_equals' && fieldValue !== searchInput) {
+                        match = true;
+                    }
+                    if (match) {
                         results.push(fields);
                     }
                 }
