@@ -1,7 +1,7 @@
 function search() {
     const fieldName = document.getElementById('fieldName').value;
     const comparison = document.getElementById('comparison').value;
-    const searchInput = document.getElementById('searchInput').value;
+    const searchInput = document.getElementById('searchInput').value.toLowerCase();
     const resultDiv = document.getElementById('result');
 
     fetch('data.csv')
@@ -15,7 +15,7 @@ function search() {
                 const fields = row.split(',');
                 const fieldIndex = headers.indexOf(fieldName);
                 if (fieldIndex !== -1) {
-                    const fieldValue = fields[fieldIndex];
+                    const fieldValue = fields[fieldIndex].toLowerCase();
                     let match = false;
                     if (comparison === 'contains' && fieldValue.includes(searchInput)) {
                         match = true;
