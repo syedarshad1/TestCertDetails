@@ -1,12 +1,75 @@
-API_NAME	API_VERSION	CONTEXT	STATUS	ORGANIZATION	UPDATED_TIME	SUSPEND_STATUS	ENDPOINT_CONFIG
-SNAP-Recipient	v1	/rest/ebt/snap-ivr/v1	PUBLISHED	carbon.super	2/22/2026 4:10 AM	No suspend logic	<endpointConfig>{'endpoint_type':'http','sandbox_endpoints':{'url':'http:\/\/ebtoneapp.prod.local:7071\/rest\/ebt\/snap-ivr\/v1'},'production_endpoints':{'url':'http:\/\/ebtoneapp.prod.local:7071\/rest\/ebt\/snap-ivr\/v1'}}</endpointConfig>
+WITH reg_apis AS (
+  SELECT
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/([0-9a-fA-F-]{36})/',
+      1, 1, NULL, 1)             AS api_uuid,
+    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+      1, 1, NULL, 1))            AS rev,
+    r.reg_content_id
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  r.reg_name = 'api'
+    AND  p.reg_path_value LIKE
+         '/_system/governance/apimgt/applicationdata/apis/%'
+),
 
+latest_rev AS (
+  SELECT
+    api_uuid,
+    MAX(reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
+  FROM   reg_apis
+  WHERE  api_uuid IS NOT NULL
+  GROUP BY api_uuid
+),
 
-host	Endpoint	API_State	API	Suspended_Count
-bdc1repoapiap8	SNAP-Recipient--vv1_APIproductionEndpoint 	SUSPENDED 	SNAP-Recipient:vv1	42
-bdc1rcdcapiap10	SNAP-Recipient--vv1_APIproductionEndpoint 	SUSPENDED 	SNAP-Recipient:vv1	18
-bdc1rcdcapiap04	SNAP-Recipient--vv1_APIproductionEndpoint 	SUSPENDED 	SNAP-Recipient:vv1	14
-bdc1rcdcapiap13	SNAP-Recipient--vv1_APIproductionEndpoint 	SUSPENDED 	SNAP-Recipient:vv1	41
+decoded AS (
+  SELECT
+    lr.api_uuid,
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 6001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 8001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS clob_txt
+  FROM   latest_rev lr
+  LEFT JOIN coct42_reg.reg_content c
+    ON   c.reg_content_id = lr.reg_content_id
+)
 
-
-TID: [-1234] [] [2026-03-14 01:33:51,105] bb781c54-dbc3-4e84-bea5-cf2138bb2c5b  INFO {org.apache.synapse.mediators.builtin.LogMediator} - {api:SNAP-Recipient:vv1} STATUS = Executing default 'fault' sequence, ERROR_CODE = 303001, ERROR_MESSAGE = Currently , Address endpoint : [ Name : SNAP-Recipient--vv1_APIproductionEndpoint ] [ State : SUSPENDED ]
+SELECT
+  a.API_NAME,
+  a.API_VERSION,
+  a.CONTEXT,
+  a.STATUS,
+  a.ORGANIZATION,
+  -- Extract just the production endpoint URL
+  REGEXP_SUBSTR(d.clob_txt,
+    '"production_endpoints".*?"url":"(.*?)"',
+    1, 1, 'n', 1)            AS production_url,
+  -- Extract just the sandbox endpoint URL
+  REGEXP_SUBSTR(d.clob_txt,
+    '"sandbox_endpoints".*?"url":"(.*?)"',
+    1, 1, 'n', 1)            AS sandbox_url,
+  CASE
+    WHEN d.clob_txt IS NULL                          THEN 'No registry entry'
+    WHEN REGEXP_LIKE(d.clob_txt, 'suspendErrorCode') THEN 'Explicit suspend config'
+    WHEN REGEXP_LIKE(d.clob_txt,
+         '"suspendMaxDuration":"0"')                  THEN 'Suspension disabled'
+    ELSE 'Default suspension'
+  END                        AS suspend_status
+FROM   COCT42_AM.AM_API a
+LEFT JOIN decoded d
+  ON   a.API_UUID = d.api_uuid
+WHERE
+  -- Change host to search for any backend host
+  REGEXP_LIKE(d.clob_txt, 'ebtoneapp.prod.local')
+ORDER BY a.API_NAME;
