@@ -1,6 +1,9 @@
-369809	POST	/v1/api/payment/customerCreditTransferInitiationsV07	Application & Application User	
-417325	POST	/v1/api/payment/customerCreditTransferInitiationsV07	Application & Application User	
-417295	POST	/v1/api/payment/customerCreditTransferInitiationsV07	Application & Application User	
-369811	GET	/v1/api/payment/customerCreditTransfers	Application & Application User	
-417293	GET	/v1/api/payment/customerCreditTransfers	Application & Application User	
-417327	GET	/v1/api/payment/customerCreditTransfers	Application & Application User	
+-- Check 1: gateway artifact storage
+SELECT *
+FROM   COCT42_AM.AM_GATEWAY_ARTIFACT_STORE
+WHERE  API_ID = '233aec86-6c19-453c-a39c-d420db2b0354';
+
+-- Check 2: gateway published API details
+SELECT *
+FROM   COCT42_AM.AM_GATEWAY_PUBLISHED_API_DETAILS
+WHERE  API_ID = '233aec86-6c19-453c-a39c-d420db2b0354';
