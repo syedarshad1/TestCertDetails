@@ -1,9 +1,6 @@
-SELECT
-  m.URL_MAPPING_ID,
-  m.HTTP_METHOD,
-  m.URL_PATTERN,
-  m.AUTH_SCHEME,
-  m.MEDIATION_SCRIPT
-FROM   COCT42_AM.AM_API_URL_MAPPING m
-WHERE  m.API_ID = 2777  -- PaymentOrderManagement API_ID
-ORDER BY m.URL_PATTERN, m.HTTP_METHOD;
+369809	POST	/v1/api/payment/customerCreditTransferInitiationsV07	Application & Application User	
+417325	POST	/v1/api/payment/customerCreditTransferInitiationsV07	Application & Application User	
+417295	POST	/v1/api/payment/customerCreditTransferInitiationsV07	Application & Application User	
+369811	GET	/v1/api/payment/customerCreditTransfers	Application & Application User	
+417293	GET	/v1/api/payment/customerCreditTransfers	Application & Application User	
+417327	GET	/v1/api/payment/customerCreditTransfers	Application & Application User	
