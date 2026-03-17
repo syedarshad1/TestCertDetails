@@ -1,28 +1,24 @@
 WITH seq_raw AS (
-  -- All in-sequence resources under provider path
   SELECT
     r.reg_name,
     r.reg_content_id,
     p.reg_path_value,
     r.reg_last_updated_time,
-    -- Extract API_NAME from path: .../provider/<prov>/<API_NAME>/<VER>/in
     REGEXP_SUBSTR(p.reg_path_value,
       '/provider/[^/]+/([^/]+)/[^/]+/in$',
-      1, 1, 'i', 1)           AS path_api_name,
-    -- Extract VERSION from path
+      1, 1, 'i', 1)             AS path_api_name,
     REGEXP_SUBSTR(p.reg_path_value,
       '/provider/[^/]+/[^/]+/([^/]+)/in$',
-      1, 1, 'i', 1)           AS path_api_version
+      1, 1, 'i', 1)             AS path_api_version
   FROM   coct42_reg.reg_resource r
   JOIN   coct42_reg.reg_path p
     ON   p.reg_path_id = r.reg_path_id
   WHERE  p.reg_path_value LIKE
            '/_system/governance/apimgt/applicationdata/provider/%/in'
-    AND  r.reg_name IS NOT NULL
+    AND  r.reg_name       IS NOT NULL
     AND  r.reg_content_id IS NOT NULL
 ),
 seq_latest AS (
-  -- Keep only the latest sequence per API_NAME + API_VERSION
   SELECT
     path_api_name,
     path_api_version,
@@ -41,6 +37,31 @@ seq_latest AS (
   WHERE  path_api_name    IS NOT NULL
     AND  path_api_version IS NOT NULL
   GROUP BY path_api_name, path_api_version
+),
+seq_blob AS (
+  -- Decode sequence blob and extract just suspendOnFailure block
+  SELECT
+    s.path_api_name,
+    s.path_api_version,
+    s.in_sequence_name,
+    s.in_sequence_path,
+    s.in_sequence_content_id,
+    s.sequence_last_updated,
+    REGEXP_SUBSTR(
+      TO_CLOB(utl_raw.cast_to_varchar2(
+        dbms_lob.substr(c.reg_content_data, 2000, 1)))  ||
+      TO_CLOB(utl_raw.cast_to_varchar2(
+        dbms_lob.substr(c.reg_content_data, 2000, 2001)))||
+      TO_CLOB(utl_raw.cast_to_varchar2(
+        dbms_lob.substr(c.reg_content_data, 2000, 4001)))||
+      TO_CLOB(utl_raw.cast_to_varchar2(
+        dbms_lob.substr(c.reg_content_data, 2000, 6001))),
+      '<suspendOnFailure>.*?</suspendOnFailure>',
+      1, 1, 'n'
+    )                           AS suspend_block
+  FROM   seq_latest s
+  JOIN   coct42_reg.reg_content c
+    ON   c.reg_content_id = s.in_sequence_content_id
 )
 SELECT
   a.API_NAME,
@@ -50,11 +71,24 @@ SELECT
   a.ORGANIZATION                  AS TENANT,
   a.UPDATED_TIME,
   s.in_sequence_name,
-  s.in_sequence_path,
-  s.in_sequence_content_id,
-  s.sequence_last_updated
+  s.sequence_last_updated,
+  CASE
+    WHEN s.suspend_block IS NULL
+      THEN 'No suspend block in sequence'
+    WHEN INSTR(s.suspend_block, '<errorCodes>-1</errorCodes>') > 0
+     AND INSTR(s.suspend_block, '<maximumDuration>0</maximumDuration>') > 0
+      THEN 'Suspension disabled'
+    WHEN INSTR(s.suspend_block, '<errorCodes>-1</errorCodes>') > 0
+      THEN 'Suspension disabled (errorCodes -1)'
+    ELSE 'Active suspension'
+  END                             AS SUSPENSION_LOGIC,
+  REPLACE(REPLACE(REPLACE(
+    s.suspend_block,
+    CHR(10), ' '),
+    CHR(13), ''),
+    CHR(9),  ' ')                  AS suspend_block
 FROM   COCT42_AM.AM_API a
-JOIN   seq_latest s
+JOIN   seq_blob s
   ON   s.path_api_name    = a.API_NAME
   AND  s.path_api_version = a.API_VERSION
-ORDER BY a.ORGANIZATION, a.API_NAME, a.API_VERSION;
+ORDER BY a.ORGANIZATION, SUSPENSION_LOGIC, a.API_NAME, a.API_VERSION;
