@@ -54,17 +54,16 @@ SELECT
     WHEN d.clob_txt IS NULL
       THEN 'No registry entry'
 
-    -- suspendMaxDuration = 0 always wins regardless of error codes
-    -- Both CoreBankingIntegration and D1-Consumer fall here
-    WHEN REGEXP_LIKE(d.clob_txt, 'suspendMaxDuration['"'"'":]+0['"'"'"]')
+    -- suspendMaxDuration = 0 is the master switch, check this first
+    WHEN INSTR(d.clob_txt, 'suspendMaxDuration') > 0
+     AND INSTR(d.clob_txt, '"suspendMaxDuration":"0"') > 0
       THEN 'Suspension effectively disabled'
 
-    -- Has suspendErrorCode AND suspendMaxDuration > 0 = truly active
-    WHEN     REGEXP_LIKE(d.clob_txt, 'suspendErrorCode')
-         AND NOT REGEXP_LIKE(d.clob_txt, 'suspendMaxDuration['"'"'":]+0['"'"'"]')
+    -- Has suspendErrorCode AND suspendMaxDuration is not 0 = truly active
+    WHEN INSTR(d.clob_txt, 'suspendErrorCode') > 0
       THEN 'Active suspension'
 
-    -- No config block at all = WSO2 default suspension kicks in
+    -- No config block = WSO2 default suspension kicks in
     ELSE 'Default suspension'
   END  AS suspend_status,
   REPLACE(REPLACE(REPLACE(REPLACE(
