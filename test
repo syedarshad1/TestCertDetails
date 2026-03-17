@@ -1,60 +1,13 @@
-WITH seq_raw AS (
-  -- All in-sequence resources under provider path
-  SELECT
-    r.reg_name,
-    r.reg_content_id,
-    p.reg_path_value,
-    r.reg_last_updated_time,
-    -- Extract API_NAME from path: .../provider/<prov>/<API_NAME>/<VER>/in
-    REGEXP_SUBSTR(p.reg_path_value,
-      '/provider/[^/]+/([^/]+)/[^/]+/in$',
-      1, 1, 'i', 1)           AS path_api_name,
-    -- Extract VERSION from path
-    REGEXP_SUBSTR(p.reg_path_value,
-      '/provider/[^/]+/[^/]+/([^/]+)/in$',
-      1, 1, 'i', 1)           AS path_api_version
-  FROM   coct42_reg.reg_resource r
-  JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id = r.reg_path_id
-  WHERE  p.reg_path_value LIKE
-           '/_system/governance/apimgt/applicationdata/provider/%/in'
-    AND  r.reg_name IS NOT NULL
-    AND  r.reg_content_id IS NOT NULL
-),
-seq_latest AS (
-  -- Keep only the latest sequence per API_NAME + API_VERSION
-  SELECT
-    path_api_name,
-    path_api_version,
-    MAX(reg_name) KEEP
-      (DENSE_RANK LAST ORDER BY reg_last_updated_time)
-      AS in_sequence_name,
-    MAX(reg_content_id) KEEP
-      (DENSE_RANK LAST ORDER BY reg_last_updated_time)
-      AS in_sequence_content_id,
-    MAX(reg_path_value) KEEP
-      (DENSE_RANK LAST ORDER BY reg_last_updated_time)
-      AS in_sequence_path,
-    MAX(reg_last_updated_time)
-      AS sequence_last_updated
-  FROM   seq_raw
-  WHERE  path_api_name    IS NOT NULL
-    AND  path_api_version IS NOT NULL
-  GROUP BY path_api_name, path_api_version
-)
-SELECT
-  a.API_NAME,
-  a.API_VERSION,
-  a.CONTEXT,
-  a.STATUS,
-  a.ORGANIZATION                  AS TENANT,
-  a.UPDATED_TIME,
-  s.in_sequence_name,
-  s.in_sequence_path,
-  s.in_sequence_content_id,
-  s.sequence_last_updated
-FROM   COCT42_AM.AM_API a
-JOIN   seq_latest s
-  ON   s.path_api_name    = a.API_NAME
-  AND  s.path_api_version = a.API_VERSION
-ORDER BY a.ORGANIZATION, a.API_NAME, a.API_VERSION;
+						<endpoint>
+							<http method="get" uri-template="{uri.var.idp}">
+							<suspendOnFailure>
+									<errorCodes>-1</errorCodes>
+									<initialDuration>0</initialDuration>
+									<progressionFactor>1.0</progressionFactor>
+									<maximumDuration>0</maximumDuration>
+								</suspendOnFailure>
+								<markForSuspension>
+									<errorCodes>-1</errorCodes>
+								</markForSuspension>
+							</http>
+						</endpoint>
