@@ -1,1 +1,20 @@
-pom_common_in	1830909	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/1.1/in	19-APR-21 09.07.24.986000000 AM
+SELECT
+  a.API_NAME,
+  a.API_VERSION,
+  a.CONTEXT,
+  a.STATUS,
+  a.ORGANIZATION                  AS TENANT,
+  a.UPDATED_TIME,
+  r.reg_name                      AS in_sequence_name,
+  p.reg_path_value                AS in_sequence_path,
+  r.reg_content_id                AS in_sequence_content_id,
+  r.reg_last_updated_time         AS sequence_last_updated
+FROM   coct42_reg.reg_resource r
+JOIN   coct42_reg.reg_path p
+  ON   p.reg_path_id = r.reg_path_id
+JOIN   COCT42_AM.AM_API a
+  ON   p.reg_path_value LIKE
+       '%/provider/%/' || a.API_NAME || '/%/in'
+WHERE  p.reg_path_value LIKE
+         '/_system/governance/apimgt/applicationdata/provider/%/in'
+ORDER BY a.ORGANIZATION, a.API_NAME, a.API_VERSION;
