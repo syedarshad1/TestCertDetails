@@ -6,8 +6,9 @@ SELECT
 FROM   coct42_reg.reg_resource r
 JOIN   coct42_reg.reg_path p
   ON   p.reg_path_id = r.reg_path_id
-WHERE  r.reg_name IN (
-         'soap_endpoint_seq_rbc_in',
-         'soap_endpoint_seq_rbc_out'
+WHERE  (
+         r.reg_name LIKE '%soap%'
+      OR r.reg_name LIKE '%rbc%'
+      OR r.reg_name LIKE '%sequence%'
        )
 ORDER BY r.reg_name;
