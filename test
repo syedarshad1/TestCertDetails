@@ -1,14 +1,3 @@
-SELECT
-  r.reg_name,
-  r.reg_content_id,
-  p.reg_path_value,
-  r.reg_last_updated_time
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-WHERE  (
-         r.reg_name LIKE '%soap%'
-      OR r.reg_name LIKE '%rbc%'
-      OR r.reg_name LIKE '%sequence%'
-       )
-ORDER BY r.reg_name;
+mbp-soap-seq-in.xml	13558447	/_system/governance/apimgt/customsequences/in
+mbp-soap-seq-in.xml	14842159	/_system/governance/apimgt/customsequences/in
+mbp-soap-seq-out.xml	13948319	/_system/governance/apimgt/customsequences/out
