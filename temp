@@ -1,5 +1,1 @@
-Active suspension — suspendDuration & suspendMaxDuration set to a non-zero value. Endpoint suspends on errors and stays down for a configured duration.
-
-Default suspension — no config found, WSO2 built-in kicks in automatically. Endpoints can suspend indefinitely. Confirmed this was the cause of the SNAP-Recipient issue in production.
-
-Suspension effectively disabled — suspendDuration & suspendMaxDuration both set to zero. No suspension risk.
+<endpointConfig>{'endpoint_type':'default','sandbox_endpoints':{'url':'default'},'production_endpoints':{'url':'default'}}</endpointConfig>
