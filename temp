@@ -43,7 +43,6 @@ decoded AS (
     ON   c.reg_content_id = lr.reg_content_id
 )
 SELECT
-  ROWNUM                       AS rn,
   a.API_NAME,
   a.API_VERSION,
   a.CONTEXT,
@@ -58,7 +57,7 @@ SELECT
     WHEN REGEXP_LIKE(d.clob_txt, '"suspendMaxDuration":"0"')
       THEN 'Suspension disabled'
     ELSE 'Default suspension'
-  END                          AS suspend_status,
+  END  AS suspend_status,
   REPLACE(REPLACE(REPLACE(REPLACE(
     REGEXP_SUBSTR(d.clob_txt,
       '<endpointConfig>.*?</endpointConfig>',
@@ -68,4 +67,4 @@ SELECT
 FROM   COCT42_AM.AM_API a
 LEFT JOIN decoded d
   ON   a.API_UUID = d.api_uuid
-ORDER BY suspend_status, a.API_NAME;
+ORDER BY suspend_status, a.API_NAME, a.API_VERSION;
