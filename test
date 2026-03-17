@@ -1,10 +1,1 @@
-SELECT
-  r.reg_name,
-  r.reg_content_id,
-  p.reg_path_value,
-  r.reg_last_updated_time
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-WHERE  r.reg_name = 'pom_common_in'
-ORDER BY r.reg_last_updated_time DESC;
+pom_common_in	1830909	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/1.1/in	19-APR-21 09.07.24.986000000 AM
