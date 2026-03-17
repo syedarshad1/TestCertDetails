@@ -1,102 +1,46 @@
-WITH reg_apis AS (
+WITH seq_raw AS (
+  -- All in-sequence resources under provider path
   SELECT
-    REGEXP_SUBSTR(p.reg_path_value,
-      '/apis/([0-9a-fA-F-]{36})/',
-      1, 1, NULL, 1)             AS api_uuid,
-    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
-      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
-      1, 1, NULL, 1))            AS rev,
-    r.reg_content_id
-  FROM   coct42_reg.reg_resource r
-  JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id = r.reg_path_id
-  WHERE  r.reg_name = 'api'
-    AND  p.reg_path_value LIKE
-         '/_system/governance/apimgt/applicationdata/apis/%'
-),
-latest_rev AS (
-  SELECT
-    api_uuid,
-    MAX(reg_content_id) KEEP
-      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
-  FROM   reg_apis
-  WHERE  api_uuid IS NOT NULL
-  GROUP BY api_uuid
-),
-decoded AS (
-  SELECT
-    lr.api_uuid,
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 6001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 8001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS clob_txt
-  FROM   latest_rev lr
-  LEFT JOIN coct42_reg.reg_content c
-    ON   c.reg_content_id = lr.reg_content_id
-),
-cleaned AS (
-  SELECT
-    d.api_uuid,
-    d.clob_txt,
-    REPLACE(REPLACE(REPLACE(REPLACE(
-      REGEXP_SUBSTR(d.clob_txt,
-        '<endpointConfig>.*?</endpointConfig>',
-        1, 1, 'n'),
-    CHR(10),''),CHR(13),''),CHR(9),''),'"','''')
-    AS endpoint_config
-  FROM   decoded d
-),
-seq_raw AS (
-  -- Latest custom in-sequence per API_NAME + API_VERSION
-  SELECT
+    r.reg_name,
+    r.reg_content_id,
+    p.reg_path_value,
+    r.reg_last_updated_time,
+    -- Extract API_NAME from path: .../provider/<prov>/<API_NAME>/<VER>/in
     REGEXP_SUBSTR(p.reg_path_value,
       '/provider/[^/]+/([^/]+)/[^/]+/in$',
-      1, 1, 'i', 1)             AS path_api_name,
+      1, 1, 'i', 1)           AS path_api_name,
+    -- Extract VERSION from path
     REGEXP_SUBSTR(p.reg_path_value,
       '/provider/[^/]+/[^/]+/([^/]+)/in$',
-      1, 1, 'i', 1)             AS path_api_version,
-    MAX(r.reg_content_id) KEEP
-      (DENSE_RANK LAST ORDER BY r.reg_last_updated_time)
-      AS reg_content_id
+      1, 1, 'i', 1)           AS path_api_version
   FROM   coct42_reg.reg_resource r
   JOIN   coct42_reg.reg_path p
     ON   p.reg_path_id = r.reg_path_id
   WHERE  p.reg_path_value LIKE
            '/_system/governance/apimgt/applicationdata/provider/%/in'
-    AND  r.reg_name       IS NOT NULL
+    AND  r.reg_name IS NOT NULL
     AND  r.reg_content_id IS NOT NULL
-  GROUP BY
-    REGEXP_SUBSTR(p.reg_path_value,
-      '/provider/[^/]+/([^/]+)/[^/]+/in$',
-      1, 1, 'i', 1),
-    REGEXP_SUBSTR(p.reg_path_value,
-      '/provider/[^/]+/[^/]+/([^/]+)/in$',
-      1, 1, 'i', 1)
 ),
-seq_decoded AS (
-  -- Decode the sequence blob
+seq_latest AS (
+  -- Keep only the latest sequence per API_NAME + API_VERSION
   SELECT
-    s.path_api_name,
-    s.path_api_version,
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 6001))) AS seq_txt
-  FROM   seq_raw s
-  JOIN   coct42_reg.reg_content c
-    ON   c.reg_content_id = s.reg_content_id
+    path_api_name,
+    path_api_version,
+    MAX(reg_name) KEEP
+      (DENSE_RANK LAST ORDER BY reg_last_updated_time)
+      AS in_sequence_name,
+    MAX(reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY reg_last_updated_time)
+      AS in_sequence_content_id,
+    MAX(reg_path_value) KEEP
+      (DENSE_RANK LAST ORDER BY reg_last_updated_time)
+      AS in_sequence_path,
+    MAX(reg_last_updated_time)
+      AS sequence_last_updated
+  FROM   seq_raw
+  WHERE  path_api_name    IS NOT NULL
+    AND  path_api_version IS NOT NULL
+  GROUP BY path_api_name, path_api_version
 )
 SELECT
   a.API_NAME,
@@ -105,45 +49,12 @@ SELECT
   a.STATUS,
   a.ORGANIZATION                  AS TENANT,
   a.UPDATED_TIME,
-  CASE
-    -- 1. No registry entry at all
-    WHEN c.clob_txt IS NULL
-      THEN 'No registry entry'
-
-    -- 2. Sequence exists and explicitly disables suspension
-    WHEN sd.seq_txt IS NOT NULL
-     AND INSTR(sd.seq_txt, '<maximumDuration>0</maximumDuration>') > 0
-     AND INSTR(sd.seq_txt, '<errorCodes>-1</errorCodes>') > 0
-      THEN 'Suspension disabled (sequence)'
-
-    -- 3. Sequence exists and has active suspension
-    WHEN sd.seq_txt IS NOT NULL
-     AND INSTR(sd.seq_txt, '<suspendOnFailure>') > 0
-     AND INSTR(sd.seq_txt, '<errorCodes>-1</errorCodes>') = 0
-      THEN 'Active suspension (sequence)'
-
-    -- 4. No sequence — check endpointConfig next
-    WHEN INSTR(c.clob_txt, '"suspendMaxDuration":"0"') > 0
-      THEN 'Suspension disabled (endpointConfig)'
-
-    WHEN INSTR(c.clob_txt, 'suspendErrorCode') > 0
-      THEN 'Active suspension (endpointConfig)'
-
-    -- 5. Nothing defined anywhere — WSO2 default
-    ELSE 'Default suspension'
-  END                             AS SUSPENSION_LOGIC,
-
-  CASE
-    WHEN sd.seq_txt IS NOT NULL THEN 'Custom sequence'
-    WHEN c.clob_txt IS NOT NULL THEN 'endpointConfig'
-    ELSE 'None'
-  END                             AS SUSPENSION_SOURCE,
-
-  c.endpoint_config
+  s.in_sequence_name,
+  s.in_sequence_path,
+  s.in_sequence_content_id,
+  s.sequence_last_updated
 FROM   COCT42_AM.AM_API a
-LEFT JOIN cleaned c
-  ON   a.API_UUID = c.api_uuid
-LEFT JOIN seq_decoded sd
-  ON   sd.path_api_name    = a.API_NAME
-  AND  sd.path_api_version = a.API_VERSION
-ORDER BY TENANT, SUSPENSION_LOGIC, a.API_NAME, a.API_VERSION;
+JOIN   seq_latest s
+  ON   s.path_api_name    = a.API_NAME
+  AND  s.path_api_version = a.API_VERSION
+ORDER BY a.ORGANIZATION, a.API_NAME, a.API_VERSION;
