@@ -22,15 +22,12 @@ seq_latest AS (
   SELECT
     path_api_name,
     path_api_version,
-    MAX(reg_name) KEEP
-      (DENSE_RANK LAST ORDER BY reg_last_updated_time)
-      AS in_sequence_name,
     MAX(reg_content_id) KEEP
       (DENSE_RANK LAST ORDER BY reg_last_updated_time)
       AS in_sequence_content_id,
-    MAX(reg_path_value) KEEP
+    MAX(reg_name) KEEP
       (DENSE_RANK LAST ORDER BY reg_last_updated_time)
-      AS in_sequence_path,
+      AS in_sequence_name,
     MAX(reg_last_updated_time)
       AS sequence_last_updated
   FROM   seq_raw
@@ -39,26 +36,19 @@ seq_latest AS (
   GROUP BY path_api_name, path_api_version
 ),
 seq_blob AS (
-  -- Decode sequence blob and extract just suspendOnFailure block
   SELECT
     s.path_api_name,
     s.path_api_version,
     s.in_sequence_name,
-    s.in_sequence_path,
-    s.in_sequence_content_id,
     s.sequence_last_updated,
-    REGEXP_SUBSTR(
-      TO_CLOB(utl_raw.cast_to_varchar2(
-        dbms_lob.substr(c.reg_content_data, 2000, 1)))  ||
-      TO_CLOB(utl_raw.cast_to_varchar2(
-        dbms_lob.substr(c.reg_content_data, 2000, 2001)))||
-      TO_CLOB(utl_raw.cast_to_varchar2(
-        dbms_lob.substr(c.reg_content_data, 2000, 4001)))||
-      TO_CLOB(utl_raw.cast_to_varchar2(
-        dbms_lob.substr(c.reg_content_data, 2000, 6001))),
-      '<suspendOnFailure>.*?</suspendOnFailure>',
-      1, 1, 'n'
-    )                           AS suspend_block
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 6001)))  AS seq_txt
   FROM   seq_latest s
   JOIN   coct42_reg.reg_content c
     ON   c.reg_content_id = s.in_sequence_content_id
@@ -69,26 +59,22 @@ SELECT
   a.CONTEXT,
   a.STATUS,
   a.ORGANIZATION                  AS TENANT,
-  a.UPDATED_TIME,
   s.in_sequence_name,
   s.sequence_last_updated,
   CASE
-    WHEN s.suspend_block IS NULL
-      THEN 'No suspend block in sequence'
-    WHEN INSTR(s.suspend_block, '<errorCodes>-1</errorCodes>') > 0
-     AND INSTR(s.suspend_block, '<maximumDuration>0</maximumDuration>') > 0
-      THEN 'Suspension disabled'
-    WHEN INSTR(s.suspend_block, '<errorCodes>-1</errorCodes>') > 0
-      THEN 'Suspension disabled (errorCodes -1)'
-    ELSE 'Active suspension'
-  END                             AS SUSPENSION_LOGIC,
-  REPLACE(REPLACE(REPLACE(
-    s.suspend_block,
-    CHR(10), ' '),
-    CHR(13), ''),
-    CHR(9),  ' ')                  AS suspend_block
+    WHEN INSTR(UPPER(s.seq_txt), 'SUSPEND') > 0
+      THEN 'Has suspend logic'
+    ELSE
+      'No suspend in sequence'
+  END                             AS SUSPEND_FOUND,
+  -- 500 char window around where 'suspend' first appears
+  SUBSTR(
+    s.seq_txt,
+    GREATEST(INSTR(UPPER(s.seq_txt), 'SUSPEND') - 50, 1),
+    500
+  )                               AS suspend_context
 FROM   COCT42_AM.AM_API a
 JOIN   seq_blob s
   ON   s.path_api_name    = a.API_NAME
   AND  s.path_api_version = a.API_VERSION
-ORDER BY a.ORGANIZATION, SUSPENSION_LOGIC, a.API_NAME, a.API_VERSION;
+ORDER BY SUSPEND_FOUND DESC, a.ORGANIZATION, a.API_NAME;
