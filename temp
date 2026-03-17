@@ -1,1 +1,43 @@
-Customer-Relationship	v5.6	/t/paypal.com/soap/enterprise-customer/relationship-services/v5.6	PUBLISHED	paypal.com	08-MAR-26	Default suspension	<endpointConfig>{'endpoint_type':'default','sandbox_endpoints':{'url':'default'},'production_endpoints':{'url':'default'}}</endpointConfig>
+SELECT
+  API_UUID,
+  API_NAME,
+  API_VERSION,
+  CONTEXT,
+  ORGANIZATION
+FROM   COCT42_AM.AM_API
+WHERE  API_NAME    = 'Customer-Relationship'
+  AND  API_VERSION = 'v5.6'
+  AND  CONTEXT     = '/t/paypal.com/soap/enterprise-customer/relationship-services/v5.6';
+
+SELECT
+  r.reg_name,
+  r.reg_media_type,
+  p.reg_path_value,
+  r.reg_content_id,
+  r.reg_last_updated_time
+FROM   coct42_reg.reg_resource r
+JOIN   coct42_reg.reg_path p
+  ON   p.reg_path_id = r.reg_path_id
+WHERE  p.reg_path_value LIKE
+       '%<paste-uuid-here>%'
+ORDER BY r.reg_last_updated_time DESC;
+
+SELECT
+  r.reg_name,
+  r.reg_media_type,
+  p.reg_path_value,
+  r.reg_content_id,
+  r.reg_last_updated_time
+FROM   coct42_reg.reg_resource r
+JOIN   coct42_reg.reg_path p
+  ON   p.reg_path_id = r.reg_path_id
+WHERE  (
+         r.reg_name     LIKE '%Customer-Relationship%'
+      OR p.reg_path_value LIKE '%Customer-Relationship%'
+       )
+  AND  (
+         p.reg_path_value LIKE '%sequence%'
+      OR p.reg_path_value LIKE '%synapse%'
+      OR r.reg_media_type  LIKE '%xml%'
+       )
+ORDER BY r.reg_last_updated_time DESC;
