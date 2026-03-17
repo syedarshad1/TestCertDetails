@@ -1,13 +1,37 @@
-SELECT
-  r.reg_name,
-  r.reg_content_id,
-  p.reg_path_value,
-  r.reg_last_updated_time
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-WHERE  (
-         r.reg_name       LIKE '%PaymentOrderManagement%'
-      OR p.reg_path_value  LIKE '%PaymentOrderManagement%'
-       )
-ORDER BY r.reg_last_updated_time DESC;
+FIS-POM-API-User-Guide-5.1.4.pdf
+swagger.json
+api
+FIS-POM-API-User-Guide-5.1.4.pdf
+FIS-POM-API-User-Guide-5.1.4.pdf
+swagger.json
+api
+FIS-POM-API-User-Guide-5.1.4.pdf
+FIS-POM-API-User-Guide-5.1.4.pdf
+swagger.json
+api
+__system_governance_apimgt_applicationdata_provider_api-bot-AT-aexp.com_PaymentOrderManagement_1.1_api
+pom_token_gen_seq_in_1.0.10
+__system_governance_apimgt_applicationdata_provider_api-bot-AT-aexp.com_PaymentOrderManagement_v1.1_api
+pom_api_request_in_1.0.10
+
+
+
+token_gen_seq_fault
+pom_api_response_out
+pom_token_gen_seq_in2
+opf_token_gen_seq_in
+api_response_out
+opf_token_gen_seq_in
+
+pom_token_gen_seq_in
+
+
+pom_common_out
+
+pom_common_in
+
+
+__system_governance_apimgt_applicationdata_provider_api-bot-AT-aexp.com_PaymentOrderManagement_5.1.4_api
+pom_common_out
+pom_common_in
+pom_common_fault
