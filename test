@@ -1,9 +1,13 @@
--- Check 1: gateway artifact storage
-SELECT *
-FROM   COCT42_AM.AM_GATEWAY_ARTIFACT_STORE
-WHERE  API_ID = '233aec86-6c19-453c-a39c-d420db2b0354';
-
--- Check 2: gateway published API details
-SELECT *
-FROM   COCT42_AM.AM_GATEWAY_PUBLISHED_API_DETAILS
-WHERE  API_ID = '233aec86-6c19-453c-a39c-d420db2b0354';
+SELECT
+  r.reg_name,
+  r.reg_content_id,
+  p.reg_path_value,
+  r.reg_last_updated_time
+FROM   coct42_reg.reg_resource r
+JOIN   coct42_reg.reg_path p
+  ON   p.reg_path_id = r.reg_path_id
+WHERE  (
+         r.reg_name       LIKE '%PaymentOrderManagement%'
+      OR p.reg_path_value  LIKE '%PaymentOrderManagement%'
+       )
+ORDER BY r.reg_last_updated_time DESC;
