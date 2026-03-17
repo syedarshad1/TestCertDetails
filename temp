@@ -70,7 +70,7 @@ SELECT
   a.API_VERSION,
   a.CONTEXT,
   a.STATUS,
-  a.ORGANIZATION,
+  a.ORGANIZATION                                  AS TENANT,
   a.UPDATED_TIME,
   CASE
     WHEN c.clob_txt IS NULL
@@ -80,9 +80,9 @@ SELECT
     WHEN INSTR(c.clob_txt, 'suspendErrorCode') > 0
       THEN 'Active suspension'
     ELSE 'Default suspension'
-  END                   AS suspend_status,
+  END                                             AS SUSPENSION_LOGIC,
   c.endpoint_config
 FROM   COCT42_AM.AM_API a
 LEFT JOIN cleaned c
   ON   a.API_UUID = c.api_uuid
-ORDER BY suspend_status, a.API_NAME, a.API_VERSION;
+ORDER BY TENANT, SUSPENSION_LOGIC, a.API_NAME, a.API_VERSION;
