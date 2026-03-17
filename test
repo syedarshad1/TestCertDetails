@@ -1,0 +1,102 @@
+-- Get API Details --
+
+SELECT * FROM COCT42_AM.AM_API WHERE API_NAME like '%P1D-CardManagement%';
+SELECT * FROM COCT42_AM.AM_API WHERE API_NAME = 'IBS-Customer-Information-Account-Demographics' and API_VERSION = 'v3';
+SELECT * FROM COCT42_AM.AM_API WHERE API_NAME = 'IBS-Customer-Information-Account-Demographics' and API_VERSION = 'v3' and CONTEXT = '/rest/IBSCIACCTDEM/v3';
+SELECT distinct(organization) FROM COCT42_AM.AM_API ;
+
+
+-- Last Updated Date/Time --
+SELECT API_ID,API_PROVIDER,API_NAME,API_VERSION,UPDATED_BY,UPDATED_TIME FROM COCT42_AM.AM_API WHERE API_NAME = 'P1D-CardManagement' and API_VERSION = 'v8';
+
+-- Get Tenant Name and ID --
+SELECT * FROM COCT42_USER.UM_TENANT
+
+select * from coct42_reg.reg_resource r
+select distinct(reg_tenant_id) from coct42_reg.reg_path p where reg_tenant_id > 10
+
+-- Get Reg_Content_ID to View the API Configuration/Swagger Details --
+SELECT 
+  r.reg_content_id,
+  r.reg_uuid,
+  r.reg_name,
+  r.reg_media_type,
+  p.reg_path_value,
+  r.reg_last_updated_time
+FROM coct42_reg.reg_resource r
+JOIN coct42_reg.reg_path p
+  ON r.reg_path_id = p.reg_path_id
+WHERE r.reg_name like  '%pay%'
+     AND p.reg_path_value LIKE '%/_system/config/%'
+  --AND p.reg_path_value LIKE '%6f8d9aa2-077e-4b7a-9106-ba78d013dc5e%'
+   --r.reg_name like  '%gs_als_loan_affiliate_add_REST%'
+  --AND p.reg_path_value  LIKE '%Billpay%'
+  --AND r.reg_tenant_id = 12
+ORDER BY r.reg_last_updated_time DESC;
+
+-- Tenant based list of API uuid --
+SELECT
+  api_uuid,
+  MAX(rev) AS latest_revision,
+  MAX(reg_content_id) KEEP (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
+FROM (
+  SELECT
+    REGEXP_SUBSTR(p.reg_path_value,
+                  '/apis/([0-9a-fA-F-]{36})/',
+                  1, 1, NULL, 1) AS api_uuid,
+    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+                            '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+                            1, 1, NULL, 1)) AS rev,
+    r.reg_content_id
+  FROM coct42_reg.reg_resource r
+  JOIN coct42_reg.reg_path p
+    ON p.reg_path_id = r.reg_path_id
+  WHERE r.reg_tenant_id = 12
+    AND r.reg_name = 'api'
+    AND p.reg_path_value LIKE '/_system/governance/apimgt/applicationdata/apis/%'
+)
+WHERE api_uuid IS NOT NULL
+GROUP BY api_uuid
+ORDER BY api_uuid;
+
+SELECT * 
+FROM coct42_am.AM_API
+WHERE API_UUID = 'c77f4d8b-986f-437c-af03-1a9b05ae5ca5';
+
+
+-- Enter the reg_content_id from previous query (API) --
+SELECT * FROM coct42_reg.reg_content c WHERE c.reg_content_id = 29909114;
+SELECT * FROM coct42_reg.reg_content c WHERE c.reg_tenant_id = 12;
+
+
+
+
+---- Enter the reg_content_id from previous query (SWAGGER) --
+SELECT * FROM coct42_reg.reg_content c WHERE c.reg_content_id = 29907668;
+
+-- Can pull in text format
+
+WITH txt AS (
+  SELECT
+    /* Adjust chunk_count * 2000 if needed */
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data, 2000, 1))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data, 2000, 6001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data, 2000, 8001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS clob_txt
+  FROM coct42_reg.reg_content c
+  WHERE c.reg_content_id = 29907668
+)
+SELECT
+  /* 1st occurrence of endpointConfig block */
+  REGEXP_SUBSTR(
+    clob_txt,
+    '<endpointConfig>.*?</endpointConfig>',
+    1, 1, 'n'
+  ) AS endpoint_config_block
+FROM txt;
+
+
+
+
