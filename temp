@@ -31,13 +31,28 @@ SELECT
 FROM   coct42_reg.reg_resource r
 JOIN   coct42_reg.reg_path p
   ON   p.reg_path_id = r.reg_path_id
-WHERE  (
-         r.reg_name     LIKE '%Customer-Relationship%'
-      OR p.reg_path_value LIKE '%Customer-Relationship%'
-       )
+WHERE  p.reg_path_value LIKE
+         '/_system/governance/apimgt/applicationdata/provider/%'
   AND  (
-         p.reg_path_value LIKE '%sequence%'
-      OR p.reg_path_value LIKE '%synapse%'
-      OR r.reg_media_type  LIKE '%xml%'
+         p.reg_path_value LIKE '%Customer-Relationship%'
+      OR r.reg_name       LIKE '%Customer-Relationship%'
        )
-ORDER BY r.reg_last_updated_time DESC;
+ORDER BY p.reg_path_value, r.reg_name;
+
+SELECT
+  r.reg_name,
+  r.reg_media_type,
+  p.reg_path_value,
+  r.reg_content_id,
+  r.reg_last_updated_time
+FROM   coct42_reg.reg_resource r
+JOIN   coct42_reg.reg_path p
+  ON   p.reg_path_id = r.reg_path_id
+WHERE  p.reg_path_value LIKE
+         '/_system/config/apimgt/applicationdata/sequences/%'
+  AND  (
+         p.reg_path_value LIKE '%Customer-Relationship%'
+      OR r.reg_name       LIKE '%Customer%'
+       )
+ORDER BY p.reg_path_value, r.reg_name;
+
