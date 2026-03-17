@@ -1,5 +1,64 @@
-ORA-00904: "P"."REG_PATH_VALUE": invalid identifier
-00904. 00000 -  "%s: invalid identifier"
-*Cause:    
-*Action:
-Error at Line: 6 Column: 33
+WITH latest_rev AS (
+  SELECT
+    api_uuid,
+    MAX(reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
+  FROM (
+    SELECT
+      REGEXP_SUBSTR(p.reg_path_value,
+        '/apis/([0-9a-fA-F-]{36})/',
+        1, 1, NULL, 1)                        AS api_uuid,
+      TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+        '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+        1, 1, NULL, 1))                        AS rev,
+      r.reg_content_id
+    FROM   coct42_reg.reg_resource r
+    JOIN   coct42_reg.reg_path p
+      ON   p.reg_path_id = r.reg_path_id
+    WHERE  r.reg_name = 'api'
+      AND  p.reg_path_value LIKE
+           '/_system/governance/apimgt/applicationdata/apis/%'
+  ) inner_q
+  WHERE  api_uuid IS NOT NULL
+  GROUP BY api_uuid
+),
+
+decoded AS (
+  SELECT
+    lr.api_uuid,
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 6001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 8001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS clob_txt
+  FROM   latest_rev lr
+  JOIN   coct42_reg.reg_content c
+    ON   c.reg_content_id = lr.reg_content_id
+)
+
+SELECT
+  a.API_NAME,
+  a.API_VERSION,
+  a.CONTEXT,
+  a.STATUS,
+  a.ORGANIZATION,
+  REGEXP_SUBSTR(
+    d.clob_txt,
+    '<endpointConfig>.*?</endpointConfig>',
+    1, 1, 'n'
+  ) AS endpoint_config
+FROM   decoded d
+JOIN   COCT42_AM.AM_API a
+  ON   a.API_UUID = d.api_uuid
+WHERE  REGEXP_LIKE(
+         d.clob_txt,
+         'suspendErrorCode'
+       )
+ORDER BY a.UPDATED_TIME DESC;
