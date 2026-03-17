@@ -41,6 +41,29 @@ decoded AS (
   FROM   latest_rev lr
   LEFT JOIN coct42_reg.reg_content c
     ON   c.reg_content_id = lr.reg_content_id
+),
+cleaned AS (
+  SELECT
+    d.api_uuid,
+    d.clob_txt,
+    REPLACE(
+      REPLACE(
+        REPLACE(
+          REPLACE(
+            REGEXP_SUBSTR(
+              d.clob_txt,
+              '<endpointConfig>.*?</endpointConfig>',
+              1, 1, 'n'
+            ),
+            CHR(10), ''
+          ),
+          CHR(13), ''
+        ),
+        CHR(9), ''
+      ),
+      '"', ''''
+    ) AS endpoint_config
+  FROM   decoded d
 )
 SELECT
   a.API_NAME,
@@ -50,29 +73,16 @@ SELECT
   a.ORGANIZATION,
   a.UPDATED_TIME,
   CASE
-    -- No registry data at all
-    WHEN d.clob_txt IS NULL
+    WHEN c.clob_txt IS NULL
       THEN 'No registry entry'
-
-    -- suspendMaxDuration = 0 is the master switch, check this first
-    WHEN INSTR(d.clob_txt, 'suspendMaxDuration') > 0
-     AND INSTR(d.clob_txt, '"suspendMaxDuration":"0"') > 0
+    WHEN INSTR(c.clob_txt, '"suspendMaxDuration":"0"') > 0
       THEN 'Suspension effectively disabled'
-
-    -- Has suspendErrorCode AND suspendMaxDuration is not 0 = truly active
-    WHEN INSTR(d.clob_txt, 'suspendErrorCode') > 0
+    WHEN INSTR(c.clob_txt, 'suspendErrorCode') > 0
       THEN 'Active suspension'
-
-    -- No config block = WSO2 default suspension kicks in
     ELSE 'Default suspension'
-  END  AS suspend_status,
-  REPLACE(REPLACE(REPLACE(REPLACE(
-    REGEXP_SUBSTR(d.clob_txt,
-      '<endpointConfig>.*?</endpointConfig>',
-      1, 1, 'n'),
-  CHR(10),''),CHR(13),''),CHR(9),''),'"','''')
-  AS endpoint_config
+  END                   AS suspend_status,
+  c.endpoint_config
 FROM   COCT42_AM.AM_API a
-LEFT JOIN decoded d
-  ON   a.API_UUID = d.api_uuid
+LEFT JOIN cleaned c
+  ON   a.API_UUID = c.api_uuid
 ORDER BY suspend_status, a.API_NAME, a.API_VERSION;
