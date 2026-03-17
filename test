@@ -1,66 +1,152 @@
-WITH reg_apis AS (
-  -- Extract UUID, revision number and content ID from registry path
-  SELECT
-    REGEXP_SUBSTR(p.reg_path_value,
-      '/apis/([0-9a-fA-F-]{36})/',
-      1, 1, NULL, 1)             AS api_uuid,
-    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
-      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
-      1, 1, NULL, 1))            AS rev,
-    r.reg_content_id
-  FROM   coct42_reg.reg_resource r
-  JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id = r.reg_path_id
-  WHERE  r.reg_name = 'api'
-    AND  p.reg_path_value LIKE
-         '/_system/governance/apimgt/applicationdata/apis/%'
-),
 
-latest_rev AS (
-  -- Keep only the latest revision per API UUID
-  SELECT
-    api_uuid,
-    MAX(reg_content_id) KEEP
-      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
-  FROM   reg_apis
-  WHERE  api_uuid IS NOT NULL
-  GROUP BY api_uuid
-),
+api
+swagger.json
 
-decoded AS (
-  -- Decode BLOB to text
-  SELECT
-    lr.api_uuid,
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 6001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 8001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS clob_txt
-  FROM   latest_rev lr
-  JOIN   coct42_reg.reg_content c
-    ON   c.reg_content_id = lr.reg_content_id
-)
+ECRecordArArRelationship Service Contract 2_0_0.pdf
+ECRecordArArRelationship_Req.xml
+ECRecordArArRelationship_Res.xml
+ECRecordArIpRelationship Service Contract 5_0_0.pdf
+ECRecordArIpRelationshipDetail Service Contract 2_0_0.pdf
+ECRecordArIpRelationshipDetail_Req.xml
+ECRecordArIpRelationshipDetail_Res.xml
+ECRecordArIpRelationship_Req.xml
+ECRecordArIpRelationship_Res.xml
+ECRecordArIpToIpReferenceRlt Service Contract 1_0_0.pdf
+ECRecordArIpToIpReferenceRlt_Req.xml
+ECRecordArIpToIpReferenceRlt_Res.xml
+ECRecordIpArRltAgreement Service Contract 1_0_0.pdf
+ECRecordIpArRltAgreement_Req.xml
+ECRecordIpArRltAgreement_Res.xml
+ECRecordIpArRltCommPreference Service Contract 2_2_0.pdf
+ECRecordIpArRltCommPreference_Req.xml
+ECRecordIpArRltCommPreference_Res.xml
+ECRecordIpIpRelationship Service Contract 3_0_0.pdf
+ECRecordIpIpRelationship_Req.xml
+ECRecordIpIpRelationship_Res.xml
+ECRecordIpPocToIpArRlt Service Contract 1_0_0.pdf
+ECRetrieveArArRelationship Service Contract 2_0_0.pdf
+ECRetrieveArArRelationship_Req.xml
+ECRetrieveArArRelationship_Res.xml
+ECRetrieveArIpRelationship Service Contract 2_1_0.pdf
+ECRetrieveArIpRelationship_Req.xml
+ECRetrieveArIpRelationship_Res.xml
+ECRetrieveArIpToIpReferenceRlt Service Contract 1_0_0.pdf
+ECRetrieveArIpToIpReferenceRlt_Req.xml
+ECRetrieveArIpToIpReferenceRlt_Res.xml
+ECRetrieveArRelationship Service Contract 5_1_0.pdf
+ECRetrieveArRelationship_Req.xml
+ECRetrieveArRelationship_Res.xml
+ECRetrieveIpArRelationship Service Contract 3_1_0.pdf
+ECRetrieveIpArRelationship_Req.xml
+ECRetrieveIpArRelationship_Res.xml
+ECRetrieveIpArRltAgreement Service Contract 1_0_0.pdf
+ECRetrieveIpArRltAgreement_Req.xml
+ECRetrieveIpArRltAgreement_Res.xml
+ECRetrieveIpArRltCommPreference Service Contract 2_2_0.pdf
+ECRetrieveIpArRltCommPreference_req.xml
+ECRetrieveIpArRltCommPreference_res.xml
+ECRetrieveIpArRltPrefSettings Service Contract 2_1_0.pdf
+ECRetrieveIpArRltPrefSettings_Req.xml
+ECRetrieveIpArRltPrefSettings_Res.xml
+ECRetrieveIpIpRelationship Service Contract 2_0_0.pdf
+ECRetrieveIpIpRelationship_Req.xml
+ECRetrieveIpIpRelationship_Res.xml
+ECRetrieveIpPocToIpArRlt Service Contract 1_0_0.pdf
+ECRetrieveIpRelationship Service Contract 5_1_0.pdf
+ECRetrieveIpRelationship_Req.xml
+ECRetrieveIpRelationship_Res.xml
 
-SELECT
-  a.API_NAME,
-  a.API_VERSION,
-  a.CONTEXT,
-  a.STATUS,
-  a.ORGANIZATION,
-  REGEXP_SUBSTR(
-    d.clob_txt,
-    '<endpointConfig>.*?</endpointConfig>',
-    1, 1, 'n'
-  ) AS endpoint_config
-FROM   decoded d
-JOIN   COCT42_AM.AM_API a
-  ON   a.API_UUID = d.api_uuid
-WHERE  REGEXP_LIKE(d.clob_txt, 'suspendErrorCode')
-ORDER BY a.UPDATED_TIME DESC;
+ECRecordArArRelationship Service Contract 2_0_0.pdf
+ECRecordArArRelationship_Req.xml
+ECRecordArArRelationship_Res.xml
+ECRecordArIpRelationship Service Contract 5_0_0.pdf
+ECRecordArIpRelationshipDetail Service Contract 2_0_0.pdf
+ECRecordArIpRelationshipDetail_Req.xml
+ECRecordArIpRelationshipDetail_Res.xml
+ECRecordArIpRelationship_Req.xml
+ECRecordArIpRelationship_Res.xml
+ECRecordArIpToIpReferenceRlt Service Contract 1_0_0.pdf
+ECRecordArIpToIpReferenceRlt_Req.xml
+ECRecordArIpToIpReferenceRlt_Res.xml
+ECRecordIpArRltAgreement Service Contract 1_0_0.pdf
+ECRecordIpArRltAgreement_Req.xml
+ECRecordIpArRltAgreement_Res.xml
+ECRecordIpArRltCommPreference Service Contract 2_2_0.pdf
+ECRecordIpArRltCommPreference_Req.xml
+ECRecordIpArRltCommPreference_Res.xml
+ECRecordIpIpRelationship Service Contract 3_0_0.pdf
+ECRecordIpIpRelationship_Req.xml
+ECRecordIpIpRelationship_Res.xml
+ECRecordIpPocToIpArRlt Service Contract 1_0_0.pdf
+ECRetrieveArArRelationship Service Contract 2_0_0.pdf
+ECRetrieveArArRelationship_Req.xml
+ECRetrieveArArRelationship_Res.xml
+ECRetrieveArIpRelationship Service Contract 2_1_0.pdf
+ECRetrieveArIpRelationship_Req.xml
+ECRetrieveArIpRelationship_Res.xml
+ECRetrieveArIpToIpReferenceRlt Service Contract 1_0_0.pdf
+ECRetrieveArIpToIpReferenceRlt_Req.xml
+ECRetrieveArIpToIpReferenceRlt_Res.xml
+ECRetrieveArRelationship Service Contract 5_1_0.pdf
+ECRetrieveArRelationship_Req.xml
+ECRetrieveArRelationship_Res.xml
+ECRetrieveIpArRelationship Service Contract 3_1_0.pdf
+ECRetrieveIpArRelationship_Req.xml
+ECRetrieveIpArRelationship_Res.xml
+ECRetrieveIpArRltAgreement Service Contract 1_0_0.pdf
+ECRetrieveIpArRltAgreement_Req.xml
+ECRetrieveIpArRltAgreement_Res.xml
+ECRetrieveIpArRltCommPreference Service Contract 2_2_0.pdf
+ECRetrieveIpArRltCommPreference_req.xml
+ECRetrieveIpArRltCommPreference_res.xml
+ECRetrieveIpArRltPrefSettings Service Contract 2_1_0.pdf
+ECRetrieveIpArRltPrefSettings_Req.xml
+ECRetrieveIpArRltPrefSettings_Res.xml
+ECRetrieveIpIpRelationship Service Contract 2_0_0.pdf
+ECRetrieveIpIpRelationship_Req.xml
+ECRetrieveIpIpRelationship_Res.xml
+ECRetrieveIpPocToIpArRlt Service Contract 1_0_0.pdf
+ECRetrieveIpRelationship Service Contract 5_1_0.pdf
+ECRetrieveIpRelationship_Req.xml
+ECRetrieveIpRelationship_Res.xml
+
+
+api
+swagger.json
+
+ECRecordArArRelationship Service Contract 2_0_0.pdf
+ECRecordArArRelationship_Req.xml
+ECRecordArArRelationship_Res.xml
+ECRecordArIpRelationship Service Contract 5_0_0.pdf
+ECRecordArIpRelationshipDetail Service Contract 2_0_0.pdf
+ECRecordArIpRelationshipDetail_Req.xml
+ECRecordArIpRelationshipDetail_Res.xml
+ECRecordArIpRelationship_Req.xml
+ECRecordArIpRelationship_Res.xml
+ECRecordArIpToIpReferenceRlt Service Contract 1_0_0.pdf
+ECRecordArIpToIpReferenceRlt_Req.xml
+ECRecordArIpToIpReferenceRlt_Res.xml
+ECRecordIpArRltAgreement Service Contract 1_0_0.pdf
+ECRecordIpArRltAgreement_Req.xml
+ECRecordIpArRltAgreement_Res.xml
+ECRecordIpArRltCommPreference Service Contract 2_2_0.pdf
+ECRecordIpArRltCommPreference_Req.xml
+ECRecordIpArRltCommPreference_Res.xml
+ECRecordIpIpRelationship Service Contract 3_0_0.pdf
+ECRecordIpIpRelationship_Req.xml
+ECRecordIpIpRelationship_Res.xml
+ECRecordIpPocToIpArRlt Service Contract 1_0_0.pdf
+ECRetrieveArArRelationship Service Contract 2_0_0.pdf
+ECRetrieveArArRelationship_Req.xml
+ECRetrieveArArRelationship_Res.xml
+ECRetrieveArIpRelationship Service Contract 2_1_0.pdf
+ECRetrieveArIpRelationship_Req.xml
+ECRetrieveArIpRelationship_Res.xml
+ECRetrieveArIpToIpReferenceRlt Service Contract 1_0_0.pdf
+ECRetrieveArIpToIpReferenceRlt_Req.xml
+ECRetrieveArIpToIpReferenceRlt_Res.xml
+ECRetrieveArRelationship Service Contract 5_1_0.pdf
+ECRetrieveArRelationship_Req.xml
+ECRetrieveArRelationship_Res.xml
+ECRetrieveIpArRelationship Service Contract 3_1_0.pdf
+ECRetrieveIpArRelationship_Req.xml
