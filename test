@@ -1,1 +1,66 @@
-<endpointConfig>{"endpoint_type":"http","sandbox_endpoints":{"template_not_supported":false,"config":null,"url":"https:\/\/coct-sandbox.prod.local\/rest\/IBSRVM\/v4"},"production_endpoints":{"endpoint_type":"http","template_not_supported":false,"config":{"suspendErrorCode":["101503"],"suspendDuration":"0","actionDuration":"60000","factor":"0.0","suspendMaxDuration":"0","actionSelect":"fault"},"url":"https:\/\/ih-prd.prod.local\/xpressng\/rest\/IBSRVM\/v4"}}</endpointConfig>
+WITH latest_rev AS (
+  SELECT
+    api_uuid,
+    MAX(reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY
+        TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+          '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+          1, 1, NULL, 1))
+      ) AS reg_content_id
+  FROM (
+    SELECT
+      REGEXP_SUBSTR(p.reg_path_value,
+        '/apis/([0-9a-fA-F-]{36})/',
+        1, 1, NULL, 1)  AS api_uuid,
+      p.reg_path_value,
+      r.reg_content_id
+    FROM   coct42_reg.reg_resource r
+    JOIN   coct42_reg.reg_path p
+      ON   p.reg_path_id = r.reg_path_id
+    WHERE  r.reg_name = 'api'
+      AND  p.reg_path_value LIKE
+           '/_system/governance/apimgt/applicationdata/apis/%'
+  )
+  WHERE  api_uuid IS NOT NULL
+  GROUP BY api_uuid
+),
+
+decoded AS (
+  SELECT
+    lr.api_uuid,
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 6001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 8001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS clob_txt
+  FROM   latest_rev lr
+  JOIN   coct42_reg.reg_content c
+    ON   c.reg_content_id = lr.reg_content_id
+)
+
+SELECT
+  a.API_NAME,
+  a.API_VERSION,
+  a.CONTEXT,
+  a.STATUS,
+  a.ORGANIZATION,
+  REGEXP_SUBSTR(
+    d.clob_txt,
+    '<endpointConfig>.*?</endpointConfig>',
+    1, 1, 'n'
+  ) AS endpoint_config
+FROM   decoded d
+JOIN   COCT42_AM.AM_API a
+  ON   a.API_UUID = d.api_uuid
+WHERE  REGEXP_LIKE(
+         d.clob_txt,
+         'suspendErrorCode'
+       )
+ORDER BY a.UPDATED_TIME DESC;
