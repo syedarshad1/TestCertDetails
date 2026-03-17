@@ -1,3 +1,18 @@
-mbp-soap-seq-in.xml	13558447	/_system/governance/apimgt/customsequences/in
-mbp-soap-seq-in.xml	14842159	/_system/governance/apimgt/customsequences/in
-mbp-soap-seq-out.xml	13948319	/_system/governance/apimgt/customsequences/out
+WITH txt AS (
+  SELECT
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 6001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 8001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS clob_txt
+  FROM   coct42_reg.reg_content c
+  WHERE  c.reg_content_id = 14842159
+)
+SELECT clob_txt FROM txt;
