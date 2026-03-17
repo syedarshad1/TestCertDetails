@@ -1,37 +1,95 @@
-FIS-POM-API-User-Guide-5.1.4.pdf
-swagger.json
-api
-FIS-POM-API-User-Guide-5.1.4.pdf
-FIS-POM-API-User-Guide-5.1.4.pdf
-swagger.json
-api
-FIS-POM-API-User-Guide-5.1.4.pdf
-FIS-POM-API-User-Guide-5.1.4.pdf
-swagger.json
-api
-__system_governance_apimgt_applicationdata_provider_api-bot-AT-aexp.com_PaymentOrderManagement_1.1_api
-pom_token_gen_seq_in_1.0.10
-__system_governance_apimgt_applicationdata_provider_api-bot-AT-aexp.com_PaymentOrderManagement_v1.1_api
-pom_api_request_in_1.0.10
+<sequence xmlns="http://ws.apache.org/ns/synapse" name="pom_common_in" trace="disable">
+    <property expression="get-property('axis2','REST_URL_POSTFIX')" name="Resource_Path" scope="default" type="STRING"/>
+	<property action="remove" name="REST_URL_POSTFIX" scope="axis2"/>
+	<property action="remove" name="X-JWT-Assertion" scope="transport"/>
+    <property action="remove" name="X-Authorization" scope="transport"/>
+    <property value="Basic QU1FWENIX1VTRVI6cGFzc3dvcmQ=" name="Authorization" scope="transport" type="STRING"/>
+    <property expression="fn:concat('http://pom-amx-pom-uat.pdcocpapp.fnfis.com/pom', get-property('Resource_Path'))" name="uri.var.pomEndpoint" scope="default" type="STRING"/>
+
+	
+
+	<log level="custom">
+		<property name="before send" value="BEFORESEND-POM"/>    
+		<property expression="get-property('uri.var.pomEndpoint')" name="POM target endpoint"/>
+	</log>
+
+	<send>
+        <endpoint>
+            <http uri-template="{uri.var.pomEndpoint}">
+				 <timeout>
+                    <duration>60000</duration>
+                </timeout>
+			</http>
+        </endpoint>
+    </send>
+</sequence>
 
 
-
-token_gen_seq_fault
-pom_api_response_out
-pom_token_gen_seq_in2
-opf_token_gen_seq_in
-api_response_out
-opf_token_gen_seq_in
-
-pom_token_gen_seq_in
-
-
-pom_common_out
-
-pom_common_in
-
-
-__system_governance_apimgt_applicationdata_provider_api-bot-AT-aexp.com_PaymentOrderManagement_5.1.4_api
-pom_common_out
-pom_common_in
-pom_common_fault
+<?xml version="1.0" encoding="UTF-8"?>
+<sequence name="pom_api_request_in_1.0.10" trace="disable" xmlns="http://ws.apache.org/ns/synapse">
+	<log level="custom">
+        <property name="apiEvent" value="AFTERSEND-JWT-POM"/>
+        <property expression="get-property('appId')" name="application-id"/>
+        <property expression="get-property('uu_identifier')" name="uuid"/>
+		<property expression="get-property('source_id')" name="source-id"/>
+		<property expression="(get-property('SYSTEM_TIME')- get-property('beforeSendTime_jwt'))" name="jwt-response-time" />
+	</log>
+	
+	<property expression="evaluate(fn:concat('$ctx:idp_cache_pom/', get-property('api.ut.application.name'), '/token/text()'))" name="jwtToken"/>
+    <property expression="fn:concat('Bearer ', get-property('jwtToken'))" name="jwt" scope="default" type="STRING"/>
+    <script language="js"><![CDATA[var payload = mc.getProperty("jsonPayload");
+ 	 mc.setPayloadJSON(payload)]]></script>
+    <property expression="$ctx:Resource_Path" name="REST_URL_POSTFIX" scope="axis2" type="STRING"/>
+    <property expression="$ctx:uu_identifier" name="uuid" scope="transport" type="STRING"/>
+	<property expression="$ctx:organization_id" name="organization-id" scope="transport" type="STRING"/>
+    <property expression="$ctx:AcceptLanguage" name="Accept-Language" scope="transport" type="STRING"/>
+    <property name="messageType" scope="axis2" type="STRING" value="application/json"/>
+    <property name="HTTP_METHOD" expression="$ctx:org.Http_Method" scope="axis2" type="STRING"/>
+    <filter regex="true" source="boolean($ctx:appId)">
+        <then>
+            <property expression="$ctx:appId" name="application-id" scope="transport" type="STRING"/>
+        </then>
+        <else/>
+    </filter>
+	<filter regex="true" source="boolean($ctx:org_IDEMPOTENCY_KEY)">
+        <then>
+            <property expression="$ctx:org_IDEMPOTENCY_KEY" name="IDEMPOTENCY_KEY" scope="transport" type="STRING"/>
+        </then>
+        <else/>
+    </filter>
+	<filter regex="true" source="boolean($ctx:org_system)">
+        <then>
+            <property expression="$ctx:org_system" name="system" scope="transport" type="STRING"/>
+        </then>
+        <else/>
+    </filter>
+	<header name="Accept" value="application/json" scope="transport"/>
+    <header name="Content-Type" value="application/json" scope="transport"/>
+    <header expression="get-property('jwt')" name="Authorization" scope="transport"/>
+    <header expression="$ctx:service-endpoint" name="To" scope="default"/>
+	<log level="custom">
+        <property name="apiEvent" value="BEFORESEND-POM"/>
+        <property expression="get-property('appId')" name="application-id"/>
+        <property expression="get-property('uu_identifier')" name="uuid"/>
+		<property expression="get-property('source_id')" name="source-id"/>
+		<property expression="$trp:IDEMPOTENCY_KEY" name="IDEMPOTENCY_KEY"/>
+		<property expression="$trp:system" name="system"/>
+		<property expression="$ctx:service-endpoint" name="targetEndpoint"/>
+	</log>
+	<property expression="get-property('SYSTEM_TIME')" name="beforeSendTime" scope="default" type="STRING"/>
+    <send>
+        <endpoint>
+            <default>
+                <suspendOnFailure>
+                    <errorCodes>-1</errorCodes>
+                    <initialDuration>0</initialDuration>
+                    <progressionFactor>1.0</progressionFactor>
+                    <maximumDuration>0</maximumDuration>
+                </suspendOnFailure>
+                <markForSuspension>
+                    <errorCodes>-1</errorCodes>
+                </markForSuspension>
+            </default>
+        </endpoint>
+    </send>
+</sequence>
