@@ -1,18 +1,155 @@
-WITH txt AS (
-  SELECT
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 6001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 8001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS clob_txt
-  FROM   coct42_reg.reg_content c
-  WHERE  c.reg_content_id = 14842159
-)
-SELECT clob_txt FROM txt;
+<sequence xmlns="http://ws.apache.org/ns/synapse" name="mbp-soap-seq-in">
+    <property expression="get-property('SYSTEM_TIME')" name="codeConnectStartTimestamp" scope="default" type="STRING"/>
+    <property expression="fn:concat(get-property('axis2', 'HTTP_METHOD'), get-property('REST_API_CONTEXT'), get-property('API_ELECTED_RESOURCE'))" name="apiContext" scope="default" type="STRING"/>
+    <property expression="$body//*[local-name()='MsgUuid']" name="uu_identifier" scope="default" type="STRING"/>
+    <property name="Resource_Path" expression="get-property('axis2','REST_URL_POSTFIX')" scope="default" type="STRING"/>
+    <property name="Resource_Ctx" expression="$ctx:REST_API_CONTEXT" scope="default" type="STRING"/>
+    <property expression="$body//*[local-name()='FeRqst']/*[local-name()='FeId']" name="organization_id" scope="default" type="STRING"/>
+	<property expression="get-property('api.ut.application.name')" name="uri.var.firmName"/>
+	<property name="org.Http_Method" expression="get-property('axis2', 'HTTP_METHOD')"/>
+	<!-- Added on 2023-03-21 Per MBPAPI Team -->
+	<header name="cc-message-id" expression="get-property('MessageID')" scope="transport"/>
+	<property expression="get-property('api.ut.application.name')" name="app_name" scope="default" type="STRING"/>
+	<filter regex="false" source="boolean(get-property('app_name'))">
+		<then>
+			<!--<log level="custom">
+				<property name="no-app_name" value="No app name found"/>
+			</log>-->
+		</then>
+		<else>
+			<!--<log level="custom">
+				<property name="AppName" expression="get-property('app_name')"/>
+			</log>-->
+			<header name="cc-app-name" scope="transport" expression="get-property('app_name')"/>
+		</else>
+	</filter>
+	<!--END-->
+    <filter xpath="fn:contains($ctx:uri.var.firmName, '-')">
+        <then>
+            <property expression="fn:substring-after($ctx:uri.var.firmName, '-')" name="uri.var.firmName" scope="default" type="STRING"/>
+        </then>
+        <else/>
+    </filter>
+	<log level="custom">
+		<property name="apiEvent" value="START"/>
+		<property name="sequenceName" value="mbp-soap-seq-in"/>
+        <property expression="$ctx:uu_identifier" name="uuid"/>
+		<property expression="get-property('MessageID')" name="messageID"/>
+        <property expression="get-property('api.ut.application.name')" name="application_name"/>
+        <property expression="$ctx:organization_id" name="organization-id"/>
+		<property expression="get-property('source_id')" name="source-id"/>
+		<property expression="get-property('apiContext')" name="Resource_Context"/> 
+        <property expression="$ctx:API_NAME" name="API_Name"/>
+    </log>   
+    <property name="api_context" expression="$ctx:API_NAME" scope="default" type="STRING"/>
+    <property name="apos" scope="default" type="STRING" value="'"/>
+	<!--<log level="custom">
+		<property name="application_name" expression="$ctx:application_name"/>
+		<property name="organization_id" expression="$ctx:organization_id"/>
+		<property name="REST_API_CONTEXT" expression="$ctx:REST_API_CONTEXT"/>
+		<property name="api_context" expression="$ctx:api_context"/>
+	</log>-->
+    <filter source="boolean(get-property('api_context'))" regex="false">
+        <then>
+            <property expression="fn:concat('$ctx:target_endpoint//Organization[@id=', get-property('apos'), $ctx:organization_id, get-property('apos'),' and @env=', get-property('apos'), $ctx:uri.var.firmName, get-property('apos'),']/node()[@ctx=', get-property('apos'), $ctx:REST_API_CONTEXT, get-property('apos'), ']/text()')" name="sep_xpath" scope="default" type="STRING"/>
+            <log level="custom">
+                <property name="api_context-compare-then-part" value="api_context is NOT present therefor using REST_API_CONTEXT"/>
+				<property name="sep_xpath" expression="$ctx:sep_xpath"/>
+            </log>
+		</then>
+        <else>
+            <property expression="fn:concat('$ctx:target_endpoint//Organization[@id=', get-property('apos'), $ctx:organization_id, get-property('apos'),' and @env=', get-property('apos'), $ctx:uri.var.firmName, get-property('apos'),']/', $ctx:api_context, '/text()')" name="sep_xpath" scope="default" type="STRING"/>
+			<log level="custom">
+                <property name="api_context-compare-else-part" value="api_context is present"/>
+				<property name="sep_xpath" expression="$ctx:sep_xpath"/>
+            </log>
+        </else>
+    </filter>
+	
+    <property expression="get-property('registry', 'conf:repository/resources/endpoints/mbp-soap-endpoints.xml')" name="target_endpoint" scope="default" type="OM"/>
+    <property expression="evaluate($ctx:sep_xpath)" name="service_endpoint" scope="default" type="STRING"/>
+    <property expression="get-property('axis2','REST_URL_POSTFIX')" name="Resource_Path" scope="default" type="STRING"/>
+    <property expression="fn:concat('/', $body//*[local-name()='ServId'])" name="svcId" scope="default" type="STRING"/>
+    <property expression="fn:string(get-property('Resource_Path')) = fn:string(get-property('svcId'))" name="propertyCompare" scope="default" type="STRING"/>
+    <log level="custom">
+		<property name="apiEvent" value="AFTER-XPATH"/>
+		<property name="sequenceName" value="mbp-soap-seq-in"/>
+        <property expression="$ctx:uu_identifier" name="uuid"/>
+		<property expression="get-property('MessageID')" name="messageID"/>
+        <property expression="get-property('api.ut.application.name')" name="application_name"/>
+		<property expression="$ctx:uri.var.firmName" name="environment"/>	
+        <property expression="$ctx:organization_id" name="organization-id"/>
+		<property expression="get-property('source_id')" name="source-id"/>
+        <property expression="$ctx:API_NAME" name="API_Name"/>
+		<property expression="$ctx:sep_xpath" name="sep_xpath"/>
+	</log>
+	<filter regex="true" source="get-property('propertyCompare')">
+        <then>
+            <property action="remove" name="REST_URL_POSTFIX" scope="axis2"/>
+        </then>
+        <else>
+            <!--<log level="custom">
+                <property name="service" value="service mis-matched"/>
+            </log>-->
+			<payloadFactory description="ErrorResponse" media-type="xml">
+                <format>
+                    <fault xmlns="">
+                        <code>400</code>
+                        <type>Status report</type>
+                        <message>Bad Request</message>
+                        <description>Service Not Matched</description>
+                    </fault>
+                </format>
+                <args/>
+            </payloadFactory>
+            <property name="Processing_Error" scope="default" type="BOOLEAN" value="true"/>
+            <property name="ERROR_MESSAGE" scope="default" type="STRING" value="Service Not Matched"/>
+            <property name="HTTP_SC" scope="axis2" type="STRING" value="400"/>
+            <property name="HTTP_SC_DESC" scope="axis2" type="STRING" value="Bad Request"/>
+            <property name="responseMessageType" scope="default" type="STRING" value="application/xml"/>
+            <header action="remove" name="To" scope="default"/>
+            <property action="remove" name="NO_ENTITY_BODY" scope="axis2"/>
+            <property action="remove" name="ContentType" scope="axis2"/>
+            <property action="remove" name="X-Forwarded-Server" scope="transport"/>
+            <property action="remove" name="X-Forwarded-For" scope="transport"/>
+            <sequence key="gov:/apimgt/customsequences/fault/mbp-soap-seq-fault"/>
+        </else>
+    </filter>
+    <header name="To" expression="$ctx:service_endpoint"/>
+	<log level="custom">
+        <property name="apiEvent" value="BEFORESEND-MBP"/>
+		<property name="sequenceName" value="mbp-soap-seq-in" />
+        <property expression="get-property('uu_identifier')" name="uuid"/>
+		<property expression="get-property('MessageID')" name="messageID"/>
+		<property expression="get-property('source_id')" name="source-id"/>
+		<property expression="$ctx:service_endpoint" name="targetEndpoint"/>		
+	</log>   
+    <filter regex="false" source="boolean($ctx:service_endpoint)">
+        <then>
+            <property name="Processing_Error" scope="default" type="BOOLEAN" value="true"/>
+            <property name="ERROR_MESSAGE" scope="default" type="STRING" value="Unknown FeId in body"/>
+            <property name="HTTP_SC" scope="axis2" type="STRING" value="400"/>
+            <property name="HTTP_SC_DESC" scope="axis2" type="STRING" value="Bad Request"/>
+            <property name="responseMessageType" scope="default" type="STRING" value="application/xml"/>
+            <sequence key="gov:/apimgt/customsequences/fault/mbp-soap-seq-fault"/>
+        </then>
+        <else/>
+    </filter>
+    <property expression="get-property('SYSTEM_TIME')" name="mbpStartTimestamp" scope="default" type="STRING"/>
+	<property expression="get-property('SYSTEM_TIME')" name="api.ut.backendRequestTime" scope="default" type="STRING"/>
+    <send>
+        <endpoint name="MBPSOAP-Endpoint">
+            <default>
+                <suspendOnFailure>
+                    <errorCodes>-1</errorCodes>
+                    <initialDuration>0</initialDuration>
+                    <progressionFactor>1.0</progressionFactor>
+                    <maximumDuration>0</maximumDuration>
+                </suspendOnFailure>
+                <markForSuspension>
+                    <errorCodes>-1</errorCodes>
+                </markForSuspension>
+            </default>
+        </endpoint>
+    </send>
+</sequence>
