@@ -1,1 +1,31 @@
-2777	233aec86-6c19-453c-a39c-d420db2b0354	PaymentOrderManagement	1.1	/t/aexp.com/rest/pom/1.1	aexp.com	PUBLISHED	09-AUG-25
+WITH latest AS (
+  SELECT
+    MAX(r.reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY
+        TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+          '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+          1, 1, NULL, 1))
+      ) AS reg_content_id
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  r.reg_name = 'api'
+    AND  p.reg_path_value LIKE
+         '%233aec86-6c19-453c-a39c-d420db2b0354%'
+)
+SELECT
+  TO_CLOB(utl_raw.cast_to_varchar2(
+    dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
+  TO_CLOB(utl_raw.cast_to_varchar2(
+    dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
+  TO_CLOB(utl_raw.cast_to_varchar2(
+    dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
+  TO_CLOB(utl_raw.cast_to_varchar2(
+    dbms_lob.substr(c.reg_content_data, 2000, 6001))) ||
+  TO_CLOB(utl_raw.cast_to_varchar2(
+    dbms_lob.substr(c.reg_content_data, 2000, 8001))) ||
+  TO_CLOB(utl_raw.cast_to_varchar2(
+    dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS api_blob
+FROM   latest l
+JOIN   coct42_reg.reg_content c
+  ON   c.reg_content_id = l.reg_content_id;
