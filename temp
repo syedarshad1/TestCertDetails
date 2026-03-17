@@ -7,3 +7,6 @@ bdc1repoapiap8	SNAP-Recipient--vv1_APIproductionEndpoint 	SUSPENDED 	SNAP-Recipi
 bdc1rcdcapiap10	SNAP-Recipient--vv1_APIproductionEndpoint 	SUSPENDED 	SNAP-Recipient:vv1	18
 bdc1rcdcapiap04	SNAP-Recipient--vv1_APIproductionEndpoint 	SUSPENDED 	SNAP-Recipient:vv1	14
 bdc1rcdcapiap13	SNAP-Recipient--vv1_APIproductionEndpoint 	SUSPENDED 	SNAP-Recipient:vv1	41
+
+
+TID: [-1234] [] [2026-03-14 01:33:51,105] bb781c54-dbc3-4e84-bea5-cf2138bb2c5b  INFO {org.apache.synapse.mediators.builtin.LogMediator} - {api:SNAP-Recipient:vv1} STATUS = Executing default 'fault' sequence, ERROR_CODE = 303001, ERROR_MESSAGE = Currently , Address endpoint : [ Name : SNAP-Recipient--vv1_APIproductionEndpoint ] [ State : SUSPENDED ]
