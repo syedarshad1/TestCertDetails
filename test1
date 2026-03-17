@@ -41,7 +41,7 @@ decoded AS (
     TO_CLOB(utl_raw.cast_to_varchar2(
       dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS clob_txt
   FROM   latest_rev lr
-  JOIN   coct42_reg.reg_content c
+  LEFT JOIN coct42_reg.reg_content c        -- LEFT JOIN to keep missing content
     ON   c.reg_content_id = lr.reg_content_id
 )
 
@@ -51,13 +51,20 @@ SELECT
   a.CONTEXT,
   a.STATUS,
   a.ORGANIZATION,
+  a.UPDATED_TIME,
+  CASE
+    WHEN d.clob_txt IS NULL
+      THEN 'No registry entry'
+    WHEN REGEXP_LIKE(d.clob_txt, 'suspendErrorCode')
+      THEN 'With suspend logic'
+    ELSE 'No suspend logic'
+  END AS suspend_status,
   REGEXP_SUBSTR(
     d.clob_txt,
     '<endpointConfig>.*?</endpointConfig>',
     1, 1, 'n'
   ) AS endpoint_config
-FROM   decoded d
-JOIN   COCT42_AM.AM_API a
+FROM   COCT42_AM.AM_API a
+LEFT JOIN decoded d                         -- LEFT JOIN to keep all 2247 APIs
   ON   a.API_UUID = d.api_uuid
-WHERE  NOT REGEXP_LIKE(d.clob_txt, 'suspendErrorCode')  -- no suspend logic
 ORDER BY a.UPDATED_TIME DESC;
