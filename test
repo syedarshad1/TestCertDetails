@@ -1,13 +1,88 @@
-						<endpoint>
-							<http method="get" uri-template="{uri.var.idp}">
-							<suspendOnFailure>
-									<errorCodes>-1</errorCodes>
-									<initialDuration>0</initialDuration>
-									<progressionFactor>1.0</progressionFactor>
-									<maximumDuration>0</maximumDuration>
-								</suspendOnFailure>
-								<markForSuspension>
-									<errorCodes>-1</errorCodes>
-								</markForSuspension>
-							</http>
-						</endpoint>
+WITH reg_apis AS (
+  SELECT
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/([0-9a-fA-F-]{36})/',
+      1, 1, NULL, 1)             AS api_uuid,
+    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+      1, 1, NULL, 1))            AS rev,
+    r.reg_content_id
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  r.reg_name = 'api'
+    AND  p.reg_path_value LIKE
+         '/_system/governance/apimgt/applicationdata/apis/%'
+),
+latest_rev AS (
+  SELECT
+    api_uuid,
+    MAX(reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
+  FROM   reg_apis
+  WHERE  api_uuid IS NOT NULL
+  GROUP BY api_uuid
+),
+decoded AS (
+  SELECT
+    lr.api_uuid,
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 6001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 8001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS clob_txt
+  FROM   latest_rev lr
+  LEFT JOIN coct42_reg.reg_content c
+    ON   c.reg_content_id = lr.reg_content_id
+),
+cleaned AS (
+  SELECT
+    d.api_uuid,
+    d.clob_txt,
+    REPLACE(
+      REPLACE(
+        REPLACE(
+          REPLACE(
+            REGEXP_SUBSTR(
+              d.clob_txt,
+              '<endpointConfig>.*?</endpointConfig>',
+              1, 1, 'n'
+            ),
+            CHR(10), ''
+          ),
+          CHR(13), ''
+        ),
+        CHR(9), ''
+      ),
+      '"', ''''
+    ) AS endpoint_config
+  FROM   decoded d
+)
+SELECT
+  a.API_NAME,
+  a.API_VERSION,
+  a.CONTEXT,
+  a.STATUS,
+  a.ORGANIZATION                                  AS TENANT,
+  a.UPDATED_TIME,
+  CASE
+    WHEN c.clob_txt IS NULL
+      THEN 'No registry entry'
+    WHEN INSTR(c.clob_txt, '"suspendMaxDuration":"0"') > 0
+      THEN 'Suspension effectively disabled'
+    WHEN INSTR(c.clob_txt, 'suspendErrorCode') > 0
+      THEN 'Active suspension'
+    ELSE 'Default suspension'
+  END                                             AS SUSPENSION_LOGIC,
+  c.endpoint_config
+FROM   COCT42_AM.AM_API a
+LEFT JOIN cleaned c
+  ON   a.API_UUID = c.api_uuid
+ORDER BY TENANT, SUSPENSION_LOGIC, a.API_NAME, a.API_VERSION;
