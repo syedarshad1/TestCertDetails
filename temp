@@ -14,7 +14,6 @@ WITH reg_apis AS (
     AND  p.reg_path_value LIKE
          '/_system/governance/apimgt/applicationdata/apis/%'
 ),
-
 latest_rev AS (
   SELECT
     api_uuid,
@@ -24,7 +23,6 @@ latest_rev AS (
   WHERE  api_uuid IS NOT NULL
   GROUP BY api_uuid
 ),
-
 decoded AS (
   SELECT
     lr.api_uuid,
@@ -44,32 +42,29 @@ decoded AS (
   LEFT JOIN coct42_reg.reg_content c
     ON   c.reg_content_id = lr.reg_content_id
 )
-
 SELECT
   a.API_NAME,
   a.API_VERSION,
   a.CONTEXT,
   a.STATUS,
   a.ORGANIZATION,
-  -- Extract just the production endpoint URL
-  REGEXP_SUBSTR(d.clob_txt,
-    '"production_endpoints".*?"url":"(.*?)"',
-    1, 1, 'n', 1)            AS production_url,
-  -- Extract just the sandbox endpoint URL
-  REGEXP_SUBSTR(d.clob_txt,
-    '"sandbox_endpoints".*?"url":"(.*?)"',
-    1, 1, 'n', 1)            AS sandbox_url,
+  a.UPDATED_TIME,
   CASE
-    WHEN d.clob_txt IS NULL                          THEN 'No registry entry'
-    WHEN REGEXP_LIKE(d.clob_txt, 'suspendErrorCode') THEN 'Explicit suspend config'
-    WHEN REGEXP_LIKE(d.clob_txt,
-         '"suspendMaxDuration":"0"')                  THEN 'Suspension disabled'
+    WHEN d.clob_txt IS NULL
+      THEN 'No registry entry'
+    WHEN REGEXP_LIKE(d.clob_txt, 'suspendErrorCode')
+      THEN 'Explicit suspend config'
+    WHEN REGEXP_LIKE(d.clob_txt, '"suspendMaxDuration":"0"')
+      THEN 'Suspension disabled'
     ELSE 'Default suspension'
-  END                        AS suspend_status
+  END                          AS suspend_status,
+  REPLACE(REPLACE(REPLACE(REPLACE(
+    REGEXP_SUBSTR(d.clob_txt,
+      '<endpointConfig>.*?</endpointConfig>',
+      1, 1, 'n'),
+  CHR(10),''),CHR(13),''),CHR(9),''),'"','''')
+  AS endpoint_config
 FROM   COCT42_AM.AM_API a
 LEFT JOIN decoded d
   ON   a.API_UUID = d.api_uuid
-WHERE
-  -- Change host to search for any backend host
-  REGEXP_LIKE(d.clob_txt, 'ebtoneapp.prod.local')
-ORDER BY a.API_NAME;
+ORDER BY suspend_status, a.API_NAME;
