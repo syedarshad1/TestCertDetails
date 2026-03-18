@@ -23,36 +23,50 @@ latest_rev AS (
   WHERE  api_uuid IS NOT NULL
   GROUP BY api_uuid
 ),
-raw_blob AS (
+raw_chunks AS (
+  -- Keep chunks separate — no concatenation
   SELECT
     lr.api_uuid,
     utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 1))    ||
+      dbms_lob.substr(c.reg_content_data, 2000, 1))    AS chunk1,
     utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 2001)) ||
+      dbms_lob.substr(c.reg_content_data, 2000, 2001))  AS chunk2,
     utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 4001)) AS blob_txt
+      dbms_lob.substr(c.reg_content_data, 2000, 4001))  AS chunk3
   FROM   latest_rev lr
   LEFT JOIN coct42_reg.reg_content c
     ON   c.reg_content_id = lr.reg_content_id
 ),
 ep_block AS (
-  -- Extract just the production_endpoints block
+  -- Find which chunk has production_endpoints and extract the block
   SELECT
     api_uuid,
-    SUBSTR(blob_txt,
-      INSTR(blob_txt, 'production_endpoints'),
-      INSTR(blob_txt, '}}',
-        INSTR(blob_txt, 'production_endpoints')) -
-      INSTR(blob_txt, 'production_endpoints') + 2
-    )                             AS prod_block
-  FROM   raw_blob
-  WHERE  INSTR(blob_txt, 'production_endpoints') > 0
+    CASE
+      WHEN INSTR(chunk1, 'production_endpoints') > 0
+        THEN SUBSTR(chunk1,
+               INSTR(chunk1, 'production_endpoints'),
+               INSTR(chunk1, '}}',
+                 INSTR(chunk1, 'production_endpoints')) -
+               INSTR(chunk1, 'production_endpoints') + 2)
+      WHEN INSTR(chunk2, 'production_endpoints') > 0
+        THEN SUBSTR(chunk2,
+               INSTR(chunk2, 'production_endpoints'),
+               INSTR(chunk2, '}}',
+                 INSTR(chunk2, 'production_endpoints')) -
+               INSTR(chunk2, 'production_endpoints') + 2)
+      WHEN INSTR(chunk3, 'production_endpoints') > 0
+        THEN SUBSTR(chunk3,
+               INSTR(chunk3, 'production_endpoints'),
+               INSTR(chunk3, '}}',
+                 INSTR(chunk3, 'production_endpoints')) -
+               INSTR(chunk3, 'production_endpoints') + 2)
+    END                           AS prod_block
+  FROM   raw_chunks
 ),
 ep_parsed AS (
   SELECT
     api_uuid,
-    -- Production URL (clean \/ to /)
+    -- Production URL
     REPLACE(
       SUBSTR(prod_block,
         INSTR(prod_block, 'url'':''') + 6,
@@ -60,7 +74,7 @@ ep_parsed AS (
           INSTR(prod_block, 'url'':''') + 6) -
         INSTR(prod_block, 'url'':''') - 6),
     '\/', '/')                    AS production_url,
-    -- Timeout ms
+    -- Timeout
     CASE WHEN INSTR(prod_block, 'actionDuration') > 0
       THEN SUBSTR(prod_block,
              INSTR(prod_block, 'actionDuration'':''') + 16,
@@ -101,20 +115,21 @@ ep_parsed AS (
              INSTR(prod_block, 'actionSelect'':''') - 14)
     END                           AS action_select
   FROM   ep_block
+  WHERE  prod_block IS NOT NULL
 )
 SELECT
   a.API_NAME,
   a.API_VERSION,
   a.CONTEXT,
   a.STATUS,
-  a.ORGANIZATION                  AS TENANT,
+  a.ORGANIZATION                   AS TENANT,
   a.UPDATED_TIME,
-  COALESCE(ep.production_url,      'Not found') AS PRODUCTION_URL,
-  COALESCE(ep.timeout_ms,          'Not set')   AS TIMEOUT_MS,
-  COALESCE(ep.suspend_duration,    'Not set')   AS SUSPEND_DURATION,
-  COALESCE(ep.suspend_max_duration,'Not set')   AS SUSPEND_MAX_DURATION,
-  COALESCE(ep.suspend_error_code,  'Not set')   AS SUSPEND_ERROR_CODE,
-  COALESCE(ep.action_select,       'Not set')   AS ACTION_SELECT
+  COALESCE(ep.production_url,       'Not found') AS PRODUCTION_URL,
+  COALESCE(ep.timeout_ms,           'Not set')   AS TIMEOUT_MS,
+  COALESCE(ep.suspend_duration,     'Not set')   AS SUSPEND_DURATION,
+  COALESCE(ep.suspend_max_duration, 'Not set')   AS SUSPEND_MAX_DURATION,
+  COALESCE(ep.suspend_error_code,   'Not set')   AS SUSPEND_ERROR_CODE,
+  COALESCE(ep.action_select,        'Not set')   AS ACTION_SELECT
 FROM   COCT42_AM.AM_API a
 LEFT JOIN ep_parsed ep
   ON   ep.api_uuid = a.API_UUID
