@@ -49,7 +49,6 @@ api_blob AS (
     ON   c.reg_content_id = lr.reg_content_id
 ),
 endpoint_config AS (
-  -- Extract endpointConfig block + production block from api blob
   SELECT
     api_uuid,
     clob_txt,
@@ -59,23 +58,20 @@ endpoint_config AS (
         1, 1, 'n'),
     CHR(10),''),CHR(13),''),CHR(9),''),'"','''')
                                   AS endpoint_config_raw,
-    -- Production block as VARCHAR2 for field extraction
     CASE
-      WHEN DBMS_LOB.INSTR(clob_txt, 'production_endpoints') > 0
+      WHEN DBMS_LOB.INSTR(clob_txt,'production_endpoints')>0
         THEN utl_raw.cast_to_varchar2(
-               dbms_lob.substr(clob_txt, 800,
-                 DBMS_LOB.INSTR(clob_txt, 'production_endpoints')))
+               dbms_lob.substr(clob_txt,800,
+                 DBMS_LOB.INSTR(clob_txt,'production_endpoints')))
       ELSE NULL
     END                           AS prod_block,
-    -- suspend found in api blob?
     CASE
-      WHEN DBMS_LOB.INSTR(UPPER(clob_txt), 'SUSPEND') > 0
+      WHEN DBMS_LOB.INSTR(UPPER(clob_txt),'SUSPEND')>0
         THEN 1 ELSE 0
     END                           AS api_has_suspend
   FROM   api_blob
 ),
 seq_resources AS (
-  -- Get in/out/fault blobs for latest revision
   SELECT
     lr.api_uuid,
     REGEXP_SUBSTR(p.reg_path_value,
@@ -105,41 +101,90 @@ seq_resources AS (
     ON   c.reg_content_id = r.reg_content_id
 ),
 seq_analysis AS (
-  -- Analyse each sequence for suspend and actionDuration
+  -- All checks per-chunk, no concatenation
   SELECT
     api_uuid,
     res_type,
     seq_name,
-    -- Combined text for searching
-    COALESCE(chunk1,'')||COALESCE(chunk2,'')||COALESCE(chunk3,'')
-                                  AS seq_txt,
-    -- Has suspend?
+    -- has suspend in any chunk
     CASE
       WHEN INSTR(UPPER(chunk1),'SUSPEND')>0
         OR   INSTR(UPPER(chunk2),'SUSPEND')>0
         OR   INSTR(UPPER(chunk3),'SUSPEND')>0
         THEN 1 ELSE 0
     END                           AS has_suspend,
-    -- actionDuration in this sequence
+    -- suspendDuration=0 check per chunk
     CASE
-      WHEN INSTR(chunk1, 'actionDuration">') > 0
+      WHEN INSTR(chunk1,'suspendDuration":0')>0
+        OR   INSTR(chunk1,'suspendDuration":"0"')>0
+        OR   INSTR(chunk1,'suspendDuration">0<')>0
+        OR   INSTR(chunk2,'suspendDuration":0')>0
+        OR   INSTR(chunk2,'suspendDuration":"0"')>0
+        OR   INSTR(chunk2,'suspendDuration">0<')>0
+        OR   INSTR(chunk3,'suspendDuration":0')>0
+        OR   INSTR(chunk3,'suspendDuration":"0"')>0
+        OR   INSTR(chunk3,'suspendDuration">0<')>0
+        THEN 1 ELSE 0
+    END                           AS suspend_dur_zero,
+    -- errorCode=-1 check per chunk
+    CASE
+      WHEN INSTR(chunk1,'errorCodes>-1<')>0
+        OR   INSTR(chunk1,'"-1"')>0
+        OR   INSTR(chunk2,'errorCodes>-1<')>0
+        OR   INSTR(chunk2,'"-1"')>0
+        OR   INSTR(chunk3,'errorCodes>-1<')>0
+        OR   INSTR(chunk3,'"-1"')>0
+        THEN 1 ELSE 0
+    END                           AS error_code_minus1,
+    -- has any suspendErrorCode
+    CASE
+      WHEN INSTR(chunk1,'suspendErrorCode')>0
+        OR   INSTR(chunk2,'suspendErrorCode')>0
+        OR   INSTR(chunk3,'suspendErrorCode')>0
+        THEN 1 ELSE 0
+    END                           AS has_error_code,
+    -- actionDuration check per chunk
+    CASE
+      WHEN INSTR(chunk1,'actionDuration">')>0
         THEN SUBSTR(chunk1,
                INSTR(chunk1,'actionDuration">')+16,
                INSTR(chunk1,'<',
                  INSTR(chunk1,'actionDuration">')+16)-
                INSTR(chunk1,'actionDuration">')-16)
-      WHEN INSTR(chunk2, 'actionDuration">') > 0
+      WHEN INSTR(chunk1,'actionDuration":"')>0
+        THEN SUBSTR(chunk1,
+               INSTR(chunk1,'actionDuration":"')+17,
+               INSTR(chunk1,'"',
+                 INSTR(chunk1,'actionDuration":"')+17)-
+               INSTR(chunk1,'actionDuration":"')-17)
+      WHEN INSTR(chunk2,'actionDuration">')>0
         THEN SUBSTR(chunk2,
                INSTR(chunk2,'actionDuration">')+16,
                INSTR(chunk2,'<',
                  INSTR(chunk2,'actionDuration">')+16)-
                INSTR(chunk2,'actionDuration">')-16)
+      WHEN INSTR(chunk2,'actionDuration":"')>0
+        THEN SUBSTR(chunk2,
+               INSTR(chunk2,'actionDuration":"')+17,
+               INSTR(chunk2,'"',
+                 INSTR(chunk2,'actionDuration":"')+17)-
+               INSTR(chunk2,'actionDuration":"')-17)
+      WHEN INSTR(chunk3,'actionDuration">')>0
+        THEN SUBSTR(chunk3,
+               INSTR(chunk3,'actionDuration">')+16,
+               INSTR(chunk3,'<',
+                 INSTR(chunk3,'actionDuration">')+16)-
+               INSTR(chunk3,'actionDuration">')-16)
+      WHEN INSTR(chunk3,'actionDuration":"')>0
+        THEN SUBSTR(chunk3,
+               INSTR(chunk3,'actionDuration":"')+17,
+               INSTR(chunk3,'"',
+                 INSTR(chunk3,'actionDuration":"')+17)-
+               INSTR(chunk3,'actionDuration":"')-17)
     END                           AS action_duration
   FROM   seq_resources
 ),
 seq_suspend AS (
-  -- Pick first sequence with suspend (in > out > fault)
-  -- Also pick first actionDuration found
   SELECT
     api_uuid,
     MAX(seq_name) KEEP
@@ -147,31 +192,33 @@ seq_suspend AS (
         CASE res_type WHEN 'in' THEN 1
                       WHEN 'out' THEN 2
                       WHEN 'fault' THEN 3 END,
-        has_suspend DESC
-      )                           AS seq_name,
-    MAX(res_type) KEEP
-      (DENSE_RANK FIRST ORDER BY
-        CASE res_type WHEN 'in' THEN 1
-                      WHEN 'out' THEN 2
-                      WHEN 'fault' THEN 3 END,
-        has_suspend DESC
-      )                           AS res_type,
-    MAX(seq_txt) KEEP
-      (DENSE_RANK FIRST ORDER BY
-        CASE res_type WHEN 'in' THEN 1
-                      WHEN 'out' THEN 2
-                      WHEN 'fault' THEN 3 END,
-        has_suspend DESC
-      )                           AS seq_txt,
+        has_suspend DESC)         AS seq_name,
     MAX(has_suspend)              AS has_suspend,
-    -- First actionDuration found across in/out/fault
+    MAX(suspend_dur_zero) KEEP
+      (DENSE_RANK FIRST ORDER BY
+        CASE res_type WHEN 'in' THEN 1
+                      WHEN 'out' THEN 2
+                      WHEN 'fault' THEN 3 END,
+        has_suspend DESC)         AS suspend_dur_zero,
+    MAX(error_code_minus1) KEEP
+      (DENSE_RANK FIRST ORDER BY
+        CASE res_type WHEN 'in' THEN 1
+                      WHEN 'out' THEN 2
+                      WHEN 'fault' THEN 3 END,
+        has_suspend DESC)         AS error_code_minus1,
+    MAX(has_error_code) KEEP
+      (DENSE_RANK FIRST ORDER BY
+        CASE res_type WHEN 'in' THEN 1
+                      WHEN 'out' THEN 2
+                      WHEN 'fault' THEN 3 END,
+        has_suspend DESC)         AS has_error_code,
     MAX(action_duration) KEEP
       (DENSE_RANK FIRST ORDER BY
         CASE res_type WHEN 'in' THEN 1
                       WHEN 'out' THEN 2
                       WHEN 'fault' THEN 3 END,
-        CASE WHEN action_duration IS NOT NULL THEN 0 ELSE 1 END
-      )                           AS seq_action_duration
+        CASE WHEN action_duration IS NOT NULL
+          THEN 0 ELSE 1 END)      AS seq_action_duration
   FROM   seq_analysis
   GROUP BY api_uuid
 )
@@ -182,76 +229,65 @@ SELECT
   a.STATUS,
   a.ORGANIZATION                  AS TENANT,
   a.UPDATED_TIME,
-  -- SUSPENSION_LOGIC: 5 categories
   CASE
-    -- 1. No registry entry
     WHEN ec.clob_txt IS NULL
       THEN 'No registry entry'
-    -- 2. suspend found in in/out/fault sequence
+    -- Sequence: disable all error codes
     WHEN ss.has_suspend = 1
-      AND (
-            INSTR(ss.seq_txt, 'suspendDuration":"0"') > 0
-         OR INSTR(ss.seq_txt, 'suspendDuration">0<') > 0
-          )
-      AND INSTR(ss.seq_txt, '"suspendErrorCode":["-1"]') > 0
+      AND  ss.suspend_dur_zero  = 1
+      AND  ss.error_code_minus1 = 1
       THEN 'Explicit disable (all error codes) - seq: '
            || ss.seq_name
+    -- Sequence: disable specific error code
     WHEN ss.has_suspend = 1
-      AND (
-            INSTR(ss.seq_txt, 'suspendDuration":"0"') > 0
-         OR INSTR(ss.seq_txt, 'suspendDuration">0<') > 0
-          )
-      AND INSTR(ss.seq_txt, 'suspendErrorCode') > 0
+      AND  ss.suspend_dur_zero = 1
+      AND  ss.has_error_code   = 1
       THEN 'Explicit disable (specific error code) - seq: '
            || ss.seq_name
+    -- Sequence: active suspension
     WHEN ss.has_suspend = 1
       THEN 'Active suspension - seq: ' || ss.seq_name
-    -- 3. suspend found in api endpointConfig
+    -- endpointConfig: disable all error codes
     WHEN ec.api_has_suspend = 1
       AND (
-            INSTR(ec.prod_block, 'suspendDuration":"0"') > 0
-         OR INSTR(ec.prod_block, 'suspendMaxDuration":"0"') > 0
+            INSTR(ec.prod_block,'suspendDuration":"0"')>0
+         OR  INSTR(ec.prod_block,'suspendMaxDuration":"0"')>0
           )
-      AND INSTR(ec.prod_block, '"suspendErrorCode":["-1"]') > 0
+      AND  INSTR(ec.prod_block,'"-1"')>0
       THEN 'Explicit disable (all error codes) - endpointConfig'
+    -- endpointConfig: disable specific error code
     WHEN ec.api_has_suspend = 1
       AND (
-            INSTR(ec.prod_block, 'suspendDuration":"0"') > 0
-         OR INSTR(ec.prod_block, 'suspendMaxDuration":"0"') > 0
+            INSTR(ec.prod_block,'suspendDuration":"0"')>0
+         OR  INSTR(ec.prod_block,'suspendMaxDuration":"0"')>0
           )
-      AND INSTR(ec.prod_block, 'suspendErrorCode') > 0
+      AND  INSTR(ec.prod_block,'suspendErrorCode')>0
       THEN 'Explicit disable (specific error code) - endpointConfig'
+    -- endpointConfig: active suspension
     WHEN ec.api_has_suspend = 1
       THEN 'Active suspension - endpointConfig'
-    -- 4. Nothing found anywhere
+    -- Nothing found anywhere
     ELSE 'Default suspension'
   END                             AS SUSPENSION_LOGIC,
-  -- Sequence file name and type
   CASE
-    WHEN ss.has_suspend = 1
-      THEN ss.seq_name
-    WHEN ec.api_has_suspend = 1
-      THEN 'api'
+    WHEN ss.has_suspend = 1     THEN ss.seq_name
+    WHEN ec.api_has_suspend = 1 THEN 'api'
     ELSE NULL
   END                             AS SEQUENCE_FILE,
   CASE
-    WHEN ss.has_suspend = 1
-      THEN 'Custom sequence'
-    WHEN ec.api_has_suspend = 1
-      THEN 'endpointConfig'
+    WHEN ss.has_suspend = 1     THEN 'Custom sequence'
+    WHEN ec.api_has_suspend = 1 THEN 'endpointConfig'
     ELSE NULL
   END                             AS SEQUENCE_TYPE,
-  -- Always print endpointConfig
   ec.endpoint_config_raw          AS ENDPOINT_CONFIG,
-  -- actionDuration: in > out > fault > api blob > global default
   COALESCE(
     ss.seq_action_duration,
-    CASE WHEN INSTR(ec.prod_block, 'actionDuration":"') > 0
+    CASE WHEN INSTR(ec.prod_block,'actionDuration":"')>0
       THEN SUBSTR(ec.prod_block,
-             INSTR(ec.prod_block, 'actionDuration":"') + 17,
-             INSTR(ec.prod_block, '"',
-               INSTR(ec.prod_block, 'actionDuration":"') + 17) -
-             INSTR(ec.prod_block, 'actionDuration":"') - 17)
+             INSTR(ec.prod_block,'actionDuration":"')+17,
+             INSTR(ec.prod_block,'"',
+               INSTR(ec.prod_block,'actionDuration":"')+17)-
+             INSTR(ec.prod_block,'actionDuration":"')-17)
     END,
     '120000ms (synapse global default)'
   )                               AS TIMEOUT_MS
