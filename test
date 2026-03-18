@@ -1,14 +1,43 @@
-Global customsequences	pom_api_request_in.xml	19149659	/_system/governance/apimgt/customsequences/in	16-MAR-26 03.24.09.274000000 PM
-Global customsequences	pom_token_gen_seq_in.xml	19149665	/_system/governance/apimgt/customsequences/in	16-MAR-26 03.24.09.453000000 PM
-Global customsequences	pom_api_response_out.xml	19149661	/_system/governance/apimgt/customsequences/out	16-MAR-26 03.24.09.323000000 PM
-Global customsequences	pom_token_gen_seq_out.xml	19149667	/_system/governance/apimgt/customsequences/out	16-MAR-26 03.24.09.521000000 PM
-Provider path	FIS-POM-API-User-Guide-5.1.4.pdf	15809653	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/documentation	09-AUG-25 10.39.59.243000000 AM
-Provider path			/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/documentation	04-DEC-20 09.04.41.527000000 AM
-Provider path	FIS-POM-API-User-Guide-5.1.4.pdf	15809659	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/documentation/files	09-AUG-25 10.39.59.550000000 AM
-Provider path			/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/documentation/files	04-DEC-20 09.04.41.533000000 AM
-Provider path	pom_common_fault	1781253	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/fault	04-DEC-20 09.04.43.436000000 AM
-Provider path			/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/fault	04-DEC-20 09.04.43.427000000 AM
-Provider path	pom_common_in	1781255	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/in	04-DEC-20 09.04.44.304000000 AM
-Provider path			/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/in	04-DEC-20 09.04.42.827000000 AM
-Provider path	pom_common_out	1781257	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/out	04-DEC-20 09.04.44.548000000 AM
-Provider path			/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/out	04-DEC-20 09.04.43.143000000 AM
+WITH latest AS (
+  SELECT
+    MAX(r.reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY
+        TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+          '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+          1, 1, NULL, 1))
+      ) AS reg_content_id
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  r.reg_name = 'api'
+    AND  p.reg_path_value LIKE
+         '%5c663424-e253-44cb-b13a-965e59b65bf1%'
+),
+txt AS (
+  SELECT
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 6001))) AS clob_txt
+  FROM   latest l
+  JOIN   coct42_reg.reg_content c
+    ON   c.reg_content_id = l.reg_content_id
+)
+SELECT
+  -- inSequence tag
+  REGEXP_SUBSTR(clob_txt,
+    '<inSequence>.*?</inSequence>',
+    1, 1, 'n')                   AS in_sequence_tag,
+  -- outSequence tag
+  REGEXP_SUBSTR(clob_txt,
+    '<outSequence>.*?</outSequence>',
+    1, 1, 'n')                   AS out_sequence_tag,
+  -- any customsequences reference
+  REGEXP_SUBSTR(clob_txt,
+    'customsequences/[^<">]+',
+    1, 1, 'i')                   AS custom_seq_ref
+FROM   txt;
