@@ -1,19 +1,4 @@
-WITH latest AS (
-  SELECT
-    MAX(r.reg_content_id) KEEP
-      (DENSE_RANK LAST ORDER BY
-        TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
-          '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
-          1, 1, NULL, 1))
-      ) AS reg_content_id
-  FROM   coct42_reg.reg_resource r
-  JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id = r.reg_path_id
-  WHERE  r.reg_name = 'api'
-    AND  p.reg_path_value LIKE
-         '%5c663424-e253-44cb-b13a-965e59b65bf1%'
-),
-txt AS (
+WITH txt AS (
   SELECT
     TO_CLOB(utl_raw.cast_to_varchar2(
       dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
@@ -23,21 +8,29 @@ txt AS (
       dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
     TO_CLOB(utl_raw.cast_to_varchar2(
       dbms_lob.substr(c.reg_content_data, 2000, 6001))) AS clob_txt
-  FROM   latest l
-  JOIN   coct42_reg.reg_content c
-    ON   c.reg_content_id = l.reg_content_id
+  FROM   coct42_reg.reg_content c
+  WHERE  c.reg_content_id = 1781255
 )
 SELECT
-  -- inSequence tag
+  clob_txt                        AS full_text,
+  -- any sequence references
   REGEXP_SUBSTR(clob_txt,
-    '<inSequence>.*?</inSequence>',
-    1, 1, 'n')                   AS in_sequence_tag,
-  -- outSequence tag
+    'customsequences/[^"<>]+',
+    1, 1, 'i')                   AS ref_1,
   REGEXP_SUBSTR(clob_txt,
-    '<outSequence>.*?</outSequence>',
-    1, 1, 'n')                   AS out_sequence_tag,
-  -- any customsequences reference
+    'customsequences/[^"<>]+',
+    1, 2, 'i')                   AS ref_2,
   REGEXP_SUBSTR(clob_txt,
-    'customsequences/[^<">]+',
-    1, 1, 'i')                   AS custom_seq_ref
+    'customsequences/[^"<>]+',
+    1, 3, 'i')                   AS ref_3,
+  -- suspend check
+  CASE
+    WHEN INSTR(UPPER(clob_txt), 'SUSPEND') > 0
+      THEN 'Has suspend'
+    ELSE 'No suspend'
+  END                             AS suspend_check,
+  -- 300 chars around suspend if found
+  SUBSTR(clob_txt,
+    GREATEST(INSTR(UPPER(clob_txt), 'SUSPEND') - 30, 1),
+    300)                           AS suspend_context
 FROM   txt;
