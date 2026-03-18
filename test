@@ -1,11 +1,1 @@
-SELECT
-  API_ID,
-  API_UUID,
-  API_NAME,
-  API_VERSION,
-  CONTEXT,
-  ORGANIZATION,
-  STATUS
-FROM   COCT42_AM.AM_API
-WHERE  API_NAME    = 'PaymentOrderManagement'
-  AND  API_VERSION = '5.1.4';
+1897	5c663424-e253-44cb-b13a-965e59b65bf1	PaymentOrderManagement	5.1.4	/t/aexp.com/rest/pom/5.1.4	aexp.com	PUBLISHED
