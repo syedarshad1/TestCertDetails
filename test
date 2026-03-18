@@ -1,11 +1,95 @@
-15809685	4f9f6558-5980-498e-a98c-ab0dabfd9de5	pom_common_out	application/json	/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/out	09-AUG-25 10.40.00.894000000 AM
-	e4248aa6-0127-4cbc-a115-b158b2c3c42b			/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/out	09-AUG-25 10.40.00.852000000 AM
-15809683	997ce50c-fab2-49cf-9010-6940b6d423b3	pom_common_in	application/json	/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/in	09-AUG-25 10.40.00.780000000 AM
-	c727d3a6-152d-41f8-8dc0-c848b00eef90			/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/in	09-AUG-25 10.40.00.743000000 AM
-15809679	b27e52a9-daab-4c19-a73e-01f44b90544b	pom_common_fault		/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/fault	09-AUG-25 10.40.00.677000000 AM
-	45fc5cba-cee3-40dc-a089-bfef1655dc8b			/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/fault	09-AUG-25 10.40.00.642000000 AM
-15809673	85df15fe-a30e-4eca-9460-3f1d62671bea	FIS-POM-API-User-Guide-5.1.4.pdf	pdf	/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/documentation/files	09-AUG-25 10.40.00.506000000 AM
-	8c8073da-5682-4ae6-bfa3-aed519b71781			/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/documentation/files	09-AUG-25 10.40.00.386000000 AM
-15809669	41bd5d76-8b70-4a44-8263-a595f972fa8d	FIS-POM-API-User-Guide-5.1.4.pdf	application/vnd.wso2-document+xml	/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/documentation	09-AUG-25 10.40.00.303000000 AM
-	a668ba16-958d-4aee-9287-c71c66a48f58			/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/documentation	09-AUG-25 10.40.00.271000000 AM
-15809665	42825979-73fa-4a5b-90c6-ca9d42e40943	swagger.json	application/json	/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2	09-AUG-25 10.40.00.205000000 AM
+WITH latest_resources AS (
+  -- Get latest revision number for this API UUID
+  SELECT
+    MAX(TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+      1, 1, NULL, 1)))          AS latest_rev
+  FROM   coct42_reg.reg_path p
+  WHERE  p.reg_path_value LIKE
+           '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/%'
+),
+seq_content AS (
+  -- Get content IDs for api, in, out, fault of latest revision
+  SELECT
+    r.reg_name,
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/(api|in|out|fault)$',
+      1, 1, 'i', 1)             AS resource_type,
+    r.reg_content_id
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  CROSS JOIN latest_resources lr
+  WHERE  p.reg_path_value LIKE
+           '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/'
+           || lr.latest_rev || '/%'
+    AND  REGEXP_LIKE(p.reg_path_value, '/(api|in|out|fault)$', 'i')
+    AND  r.reg_content_id IS NOT NULL
+),
+decoded AS (
+  -- Decode each resource blob into chunks
+  SELECT
+    s.reg_name,
+    s.resource_type,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1))    AS chunk1,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001))  AS chunk2,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 4001))  AS chunk3
+  FROM   seq_content s
+  JOIN   coct42_reg.reg_content c
+    ON   c.reg_content_id = s.reg_content_id
+)
+SELECT
+  resource_type,
+  reg_name,
+  -- Suspension check across all chunks
+  CASE
+    WHEN INSTR(UPPER(chunk1), 'SUSPEND') > 0
+      THEN SUBSTR(chunk1,
+             GREATEST(INSTR(UPPER(chunk1), 'SUSPEND') - 20, 1), 300)
+    WHEN INSTR(UPPER(chunk2), 'SUSPEND') > 0
+      THEN SUBSTR(chunk2,
+             GREATEST(INSTR(UPPER(chunk2), 'SUSPEND') - 20, 1), 300)
+    WHEN INSTR(UPPER(chunk3), 'SUSPEND') > 0
+      THEN SUBSTR(chunk3,
+             GREATEST(INSTR(UPPER(chunk3), 'SUSPEND') - 20, 1), 300)
+    ELSE 'No suspend'
+  END                             AS suspend_context,
+  -- Global sequence references
+  CASE
+    WHEN INSTR(chunk1, 'customsequences') > 0
+      THEN SUBSTR(chunk1,
+             INSTR(chunk1, 'customsequences'),
+             200)
+    WHEN INSTR(chunk2, 'customsequences') > 0
+      THEN SUBSTR(chunk2,
+             INSTR(chunk2, 'customsequences'),
+             200)
+    WHEN INSTR(chunk3, 'customsequences') > 0
+      THEN SUBSTR(chunk3,
+             INSTR(chunk3, 'customsequences'),
+             200)
+    ELSE 'No global seq reference'
+  END                             AS global_seq_ref,
+  -- endpointConfig suspension (api blob only)
+  CASE
+    WHEN resource_type = 'api'
+     AND INSTR(chunk1, 'suspendMaxDuration":"0"') > 0
+      THEN 'Suspension disabled (endpointConfig)'
+    WHEN resource_type = 'api'
+     AND INSTR(chunk1, 'suspendErrorCode') > 0
+      THEN 'Active suspension (endpointConfig)'
+    WHEN resource_type = 'api'
+      THEN 'No suspend in endpointConfig'
+    ELSE '-'
+  END                             AS endpoint_config_suspend
+FROM   decoded
+ORDER BY
+  CASE resource_type
+    WHEN 'api'   THEN 1
+    WHEN 'in'    THEN 2
+    WHEN 'out'   THEN 3
+    WHEN 'fault' THEN 4
+  END;
