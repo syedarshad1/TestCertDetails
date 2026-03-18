@@ -13,38 +13,54 @@ latest_rev AS (
   JOIN   coct42_reg.reg_resource r
     ON   r.reg_name = 'api'
   JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id = r.reg_path_id
-  WHERE  DBMS_LOB.INSTR(
-           p.reg_path_value,
-           t.API_UUID
-         ) > 0
+    ON   p.reg_path_id  = r.reg_path_id
+    AND  p.reg_path_value LIKE
+           '/_system/governance/apimgt/applicationdata/apis/%'
+    AND  p.reg_path_value LIKE '%' || t.API_UUID || '%'
   GROUP BY t.API_NAME, t.API_VERSION
 ),
 api_blob AS (
+  -- Decode blob into VARCHAR2 (first 4000 chars covers sequence tags)
+  -- Use SUBSTR on decoded text to extract inSequence/outSequence
   SELECT
     lr.API_NAME,
     lr.API_VERSION,
-    REGEXP_SUBSTR(
-      TO_CLOB(utl_raw.cast_to_varchar2(
-        dbms_lob.substr(c.reg_content_data, 2000, 1)))  ||
-      TO_CLOB(utl_raw.cast_to_varchar2(
-        dbms_lob.substr(c.reg_content_data, 2000, 2001)))||
-      TO_CLOB(utl_raw.cast_to_varchar2(
-        dbms_lob.substr(c.reg_content_data, 2000, 4001))),
-      '<inSequence>([^<]+)</inSequence>',
-      1, 1, 'n', 1)               AS in_seq_from_blob,
-    REGEXP_SUBSTR(
-      TO_CLOB(utl_raw.cast_to_varchar2(
-        dbms_lob.substr(c.reg_content_data, 2000, 1)))  ||
-      TO_CLOB(utl_raw.cast_to_varchar2(
-        dbms_lob.substr(c.reg_content_data, 2000, 2001)))||
-      TO_CLOB(utl_raw.cast_to_varchar2(
-        dbms_lob.substr(c.reg_content_data, 2000, 4001))),
-      '<outSequence>([^<]+)</outSequence>',
-      1, 1, 'n', 1)               AS out_seq_from_blob
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1)) ||
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001)) AS blob_txt
   FROM   latest_rev lr
   JOIN   coct42_reg.reg_content c
     ON   c.reg_content_id = lr.reg_content_id
+),
+api_seq AS (
+  -- Extract inSequence and outSequence from VARCHAR2 blob
+  SELECT
+    API_NAME,
+    API_VERSION,
+    -- inSequence: text between tags
+    CASE
+      WHEN INSTR(blob_txt, '<inSequence>') > 0
+       AND INSTR(blob_txt, '</inSequence>') > 0
+        THEN TRIM(SUBSTR(
+               blob_txt,
+               INSTR(blob_txt, '<inSequence>') + 12,
+               INSTR(blob_txt, '</inSequence>')
+                 - INSTR(blob_txt, '<inSequence>') - 12
+             ))
+    END                           AS in_seq_from_blob,
+    -- outSequence: text between tags
+    CASE
+      WHEN INSTR(blob_txt, '<outSequence>') > 0
+       AND INSTR(blob_txt, '</outSequence>') > 0
+        THEN TRIM(SUBSTR(
+               blob_txt,
+               INSTR(blob_txt, '<outSequence>') + 13,
+               INSTR(blob_txt, '</outSequence>')
+                 - INSTR(blob_txt, '<outSequence>') - 13
+             ))
+    END                           AS out_seq_from_blob
+  FROM   api_blob
 ),
 provider_seq AS (
   SELECT
@@ -83,31 +99,31 @@ provider_seq AS (
       1, 1, 'i', 1)
 )
 SELECT
-  ab.API_NAME,
-  ab.API_VERSION,
+  s.API_NAME,
+  s.API_VERSION,
   COALESCE(pin.seq_name,
-           ab.in_seq_from_blob,
+           NULLIF(s.in_seq_from_blob, ''),
            'None')               AS in_sequence_name,
   CASE
-    WHEN pin.seq_name        IS NOT NULL THEN 'Provider path'
-    WHEN ab.in_seq_from_blob IS NOT NULL THEN 'Global (API blob tag)'
+    WHEN pin.seq_name              IS NOT NULL THEN 'Provider path'
+    WHEN NULLIF(s.in_seq_from_blob,  '') IS NOT NULL THEN 'Global (API blob tag)'
     ELSE 'None'
   END                             AS in_sequence_source,
   COALESCE(pout.seq_name,
-           ab.out_seq_from_blob,
+           NULLIF(s.out_seq_from_blob, ''),
            'None')               AS out_sequence_name,
   CASE
-    WHEN pout.seq_name        IS NOT NULL THEN 'Provider path'
-    WHEN ab.out_seq_from_blob IS NOT NULL THEN 'Global (API blob tag)'
+    WHEN pout.seq_name             IS NOT NULL THEN 'Provider path'
+    WHEN NULLIF(s.out_seq_from_blob, '') IS NOT NULL THEN 'Global (API blob tag)'
     ELSE 'None'
   END                             AS out_sequence_source
-FROM   api_blob ab
+FROM   api_seq s
 LEFT JOIN provider_seq pin
-  ON   pin.api_name    = ab.API_NAME
-  AND  pin.api_version = ab.API_VERSION
+  ON   pin.api_name    = s.API_NAME
+  AND  pin.api_version = s.API_VERSION
   AND  pin.seq_type    = 'in'
 LEFT JOIN provider_seq pout
-  ON   pout.api_name    = ab.API_NAME
-  AND  pout.api_version = ab.API_VERSION
+  ON   pout.api_name    = s.API_NAME
+  AND  pout.api_version = s.API_VERSION
   AND  pout.seq_type    = 'out'
-ORDER BY ab.API_VERSION;
+ORDER BY s.API_VERSION;
