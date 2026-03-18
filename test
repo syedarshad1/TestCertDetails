@@ -1,15 +1,146 @@
-<send receive="gov:/apimgt/customsequences/out/pom_token_gen_seq_out.xml">
-<endpoint>
-<http method="get" uri-template="{uri.var.idp}">
-<suspendOnFailure>
-<errorCodes>-1</errorCodes>
-<initialDuration>0</initialDuration>
-<progressionFactor>1.0</progressionFactor>
-<maximumDuration>0</maximumDuration>
-</suspendOnFailure>
-<markForSuspension>
-<errorCodes>-1</errorCodes>
-</markForSuspension>
-</http>
-</endpoint>
-</send>
+<?xml version="1.0" encoding="UTF-8"?>
+<sequence name="pom_token_gen_seq_in" onError="gov:/apimgt/customsequences/fault/token_gen_seq_fault.xml" trace="disable" xmlns="http://ws.apache.org/ns/synapse">
+	<property expression="get-property('SYSTEM_TIME')" name="api.ut.backendRequestTime" scope="default" type="STRING"/>
+	<property expression="get-property('axis2','REST_URL_POSTFIX')" name="Resource_Path" scope="default" type="STRING"/>
+    <property expression="$trp:organization-id" name="organization_id" scope="default" type="STRING"/>
+	<property expression="$trp:source-id" name="source_id" scope="default" type="STRING"/>
+    <property expression="$trp:uuid" name="uu_identifier" scope="default" type="STRING"/>
+	<property expression="$trp:IDEMPOTENCY_KEY" name="org_IDEMPOTENCY_KEY" scope="default" type="STRING"/>
+	<property expression="$trp:system" name="org_system" scope="default" type="STRING"/>
+    <property expression="$trp:Accept-Language" name="AcceptLanguage" scope="default" type="STRING"/>
+	<property name="org.Http_Method" expression="get-property('axis2', 'HTTP_METHOD')"/>
+	
+	<filter regex="true" source="boolean($trp:application-id)">
+        <then>
+            <property expression="$trp:application-id" name="appId" scope="default" type="STRING"/>
+            <property action="remove" name="application-id" scope="transport"/>
+        </then>
+        <else/>
+    </filter>
+    <property name="quote" scope="default" type="STRING" value="'"/>
+	
+	<filter xpath="get-property('api.ut.application.name') != ''">
+        <then>
+			<property expression="fn:substring-after(get-property('api.ut.application.name'), '-')" name="uri.var.firmName" scope="default" type="STRING"/>
+			<property expression="wso2:vault-lookup(fn:concat(get-property('api.ut.application.name'), '_opfApikey'))" name="X-SunGard-IdP-API-Key" scope="transport" type="STRING"/>
+			<property expression="wso2:vault-lookup(fn:concat(get-property('api.ut.application.name'), '_opfAuthkey'))" name="Authorization" scope="transport" type="STRING"/>
+			<property expression="wso2:vault-lookup(fn:concat(get-property('api.ut.application.name'), '_opfClientid'))" name="uri.var.queryParam" scope="default" type="STRING"/>
+	</then>
+        <else>
+			<property name="HTTP_SC" scope="axis2" type="STRING" value="500"/>
+			<property name="ERROR_MESSAGE" scope="default" type="STRING" value="application name not found, check name is following the naming convention channelName-idpFirmName"/>
+            <sequence key="gov:/apimgt/customsequences/fault/token_gen_seq_fault.xml"/>
+            <respond/>
+		</else>
+    </filter>
+	
+	<property expression="get-property('registry', 'conf:repository/resources/endpoints/pom_api_endpoints.xml')" name="target_endpoint" scope="default" type="OM"/>
+	<property expression="fn:concat('$ctx:target_endpoint//Organization[@idpfirm=', get-property('quote'), $ctx:uri.var.firmName, get-property('quote'), ']/node()[@ctx=', get-property('quote'), $ctx:REST_API_CONTEXT, get-property('quote'), ']/text()')" name="sep_xpath" scope="default" type="STRING"/>
+    <property expression="fn:concat('$ctx:target_endpoint//Organization[@idpfirm=', get-property('quote'), $ctx:uri.var.firmName, get-property('quote'), ']/Dih/text()')" name="dih_xpath" scope="default" type="STRING"/>
+    <property expression="evaluate($ctx:sep_xpath)" name="service-endpoint" scope="default" type="STRING"/>
+    <property expression="evaluate($ctx:dih_xpath)" name="dih-endpoint" scope="default" type="STRING"/>
+	
+	
+	<property name="protected_params" expression="$trp:protected-parameters" scope="default" type="STRING"/>
+    <property name="ProtectedParams" expression="base64Decode(get-property('protected_params'))"/>
+    <filter regex="true" source="boolean(get-property('protected_params'))">
+        <then>
+		   <property name="Resource_Path" expression="get-property('axis2','REST_URL_POSTFIX')"  scope="default" type="STRING"/>
+					<script description="" language="js"><![CDATA[	
+								var pparam = mc.getProperty('ProtectedParams');
+								  var rpath = mc.getProperty('Resource_Path');
+								  var obj = JSON.parse(pparam);
+								  for (key in obj) {
+									rpath = rpath.replace("/"+key,"/"+obj[key]);
+									rpath = rpath.replace("="+key,"="+obj[key]);
+								  }
+								  mc.setProperty('pparam', pparam);
+								  mc.setProperty('Resource_Path', rpath);
+					]]></script> 
+                 <property action="remove" name="protected-parameters" scope="transport"/>	
+				 <property name="ProtectedParams" action="remove"/>
+		</then>
+		<else>
+			<log level="custom">
+				<property name="no-protected-params" value="No Protected Params Header"/>
+			</log>
+		</else>
+	</filter>
+
+    <script language="js"><![CDATA[var payload = mc.getPayloadJSON();
+	mc.setProperty("jsonPayload",JSON.stringify(payload));]]></script>
+    <payloadFactory media-type="json">
+        <format/>
+        <args/>
+    </payloadFactory>
+
+    <property name="messageType" scope="axis2" type="STRING" value="application/x-www-form-urlencoded"/>
+    <property action="remove" name="REST_URL_POSTFIX" scope="axis2"/>
+    <property action="remove" name="Cookie" scope="transport"/>
+    <property action="remove" name="activityID" scope="transport"/>
+	<property expression="$trp:uuid" name="uuid" scope="transport" type="STRING"/>
+	<property expression="fn:concat($ctx:dih-endpoint, $ctx:uri.var.firmName,'/rest/1.0/idptoken/openid-connect?client_id=', $ctx:uri.var.queryParam)" name="uri.var.idp" scope="default" type="STRING"/>
+	
+	<property expression="get-property('SYSTEM_TIME')" name="beforeSendTime_jwt" scope="default" type="STRING"/>
+	<header expression="$ctx:uri.var.idp" name="To" scope="default"/>
+	
+	<property name="idp_auth_path" scope="default" type="STRING" value="conf:repository/resources/properties/idp_cache_pom.xml"/>
+    <property expression="get-property('registry', $ctx:idp_auth_path)" name="idp_cache_pom" scope="default" type="OM" xmlns:ns="http://org.apache.synapse/xsd"/>
+		
+	<log level="custom">
+        <property name="apiEvent" value="BEFORESEND-JWT-POM"/>
+        <property expression="get-property('appId')" name="application-id"/>
+		<property expression="get-property('source_id')" name="source-id"/>
+        <property expression="get-property('uu_identifier')" name="uuid"/>
+		<property expression="$ctx:uri.var.idp" name="targetEndpoint-jwt"/>
+	</log>
+	<property name="intermediateCallURL"  expression="$ctx:uri.var.idp"/>
+	
+	<filter source="boolean(evaluate(fn:concat('$ctx:idp_cache_pom/', get-property('api.ut.application.name'))))" regex="true">
+		<then>
+			<property expression="evaluate(fn:concat('number($ctx:idp_cache_pom/', get-property('api.ut.application.name'), '/timestamp/text())-', get-property('SYSTEM_TIME')))" name="jwt_validity" scope="default" type="STRING"/>
+            <filter xpath="120000.0 >= $ctx:jwt_validity or $ctx:jwt_validity='NaN' or $trp:tokenReset = 'true'">
+				<then>
+					<property value="expired" name="tokenType" scope="default" type="STRING"/>
+					<send receive="gov:/apimgt/customsequences/out/pom_token_gen_seq_out.xml">
+						<endpoint>
+							<http method="get" uri-template="{uri.var.idp}">
+							<suspendOnFailure>
+									<errorCodes>-1</errorCodes>
+									<initialDuration>0</initialDuration>
+									<progressionFactor>1.0</progressionFactor>
+									<maximumDuration>0</maximumDuration>
+								</suspendOnFailure>
+								<markForSuspension>
+									<errorCodes>-1</errorCodes>
+								</markForSuspension>
+							</http>
+						</endpoint>
+					</send>
+				</then>
+				<else>
+					<sequence key="gov:/apimgt/customsequences/in/pom_api_request_in.xml"/>
+				</else>
+			</filter>
+		</then>
+		<else>
+			<property value="new" name="tokenType" scope="default" type="STRING"/>
+			<send receive="gov:/apimgt/customsequences/out/pom_token_gen_seq_out.xml">
+				<endpoint>
+					<http method="get" uri-template="{uri.var.idp}">
+					    <suspendOnFailure>
+							<errorCodes>-1</errorCodes>
+							<initialDuration>0</initialDuration>
+							<progressionFactor>1.0</progressionFactor>
+							<maximumDuration>0</maximumDuration>
+						</suspendOnFailure>
+						<markForSuspension>
+							<errorCodes>-1</errorCodes>
+						</markForSuspension>
+					</http>
+				</endpoint>
+			</send>
+		</else>
+	</filter>
+	
+</sequence>
