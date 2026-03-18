@@ -1,23 +1,35 @@
-		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872	08-FEB-26 02.56.27.615000000 AM
-api	18558197	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/1	08-FEB-26 02.56.27.661000000 AM
-swagger.json	18558199	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/1	08-FEB-26 02.56.27.750000000 AM
-		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/1	08-FEB-26 02.56.27.621000000 AM
-api	18559865	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2	08-FEB-26 04.22.21.955000000 AM
-swagger.json	18559867	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2	08-FEB-26 04.22.22.170000000 AM
-		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2	08-FEB-26 04.22.21.919000000 AM
-Card Add	18559869	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.358000000 AM
-Card Delete	18559871	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.426000000 AM
-Card Inquiry	18559873	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.475000000 AM
-Card Reissue	18559875	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.528000000 AM
-Card Replace	18559877	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.576000000 AM
-Card Update	18559879	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.698000000 AM
-P1D Card Management V9 Release Notes	18559881	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.768000000 AM
-		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.322000000 AM
-P1D-CardManagement-V9-ReleaseNotes.pdf	18559883	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation/files	08-FEB-26 04.22.22.901000000 AM
-		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation/files	08-FEB-26 04.22.22.821000000 AM
-api	18560005	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/3	08-FEB-26 04.27.14.409000000 AM
-swagger.json	18560007	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/3	08-FEB-26 04.27.14.495000000 AM
-		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/3	08-FEB-26 04.27.14.375000000 AM
-		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/3/documentation	08-FEB-26 04.27.14.553000000 AM
-P1D-CardManagement-V9-ReleaseNotes.pdf	18560009	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/3/documentation/files	08-FEB-26 04.27.14.660000000 AM
-		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/3/documentation/files	08-FEB-26 04.27.14.602000000 AM
+WITH raw AS (
+  SELECT
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1))   AS chunk1,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001)) AS chunk2
+  FROM   coct42_reg.reg_content c
+  WHERE  c.reg_content_id = 18560005
+),
+ep AS (
+  -- Find which chunk has production_endpoints
+  SELECT
+    CASE
+      WHEN INSTR(chunk1, 'production_endpoints') > 0
+        THEN SUBSTR(chunk1,
+               INSTR(chunk1, 'production_endpoints'),
+               500)
+      WHEN INSTR(chunk2, 'production_endpoints') > 0
+        THEN SUBSTR(chunk2,
+               INSTR(chunk2, 'production_endpoints'),
+               500)
+    END                           AS prod_block
+  FROM   raw
+)
+SELECT
+  prod_block,
+  -- show 60 chars around url key
+  SUBSTR(prod_block,
+    INSTR(prod_block, 'url'), 60)  AS url_area,
+  -- show 150 chars around suspend
+  SUBSTR(prod_block,
+    GREATEST(INSTR(prod_block,'suspend')-5,1),
+    150)                          AS suspend_area
+FROM   ep
+WHERE  prod_block IS NOT NULL;
