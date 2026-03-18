@@ -1,18 +1,15 @@
-pom_token_gen_seq_in	No	No suspend found
-pom_token_gen_seq_in_1.0.10	No	No suspend found
-pom_token_gen_seq_in2	No	No suspend found
-pom_common_in	No	No suspend found
-pom_api_request_in_1.0.10	Yes	"t>
-                <suspendOnFailure>
-                    <errorCodes>-1</errorCodes>
-                    <initialDuration>0</initialDuration>
-                    <progressionFactor>1.0</progressionFactor>
-                    <maximumDuration>0</maximumDuration>
-                </suspendOnFailure>
- "
-opf_token_gen_seq_in	No	No suspend found
-pom_api_response_out	No	No suspend found
-api_response_out	No	No suspend found
-pom_common_out	No	No suspend found
-token_gen_seq_fault	No	No suspend found
-opf_token_gen_seq_in	No	No suspend found
+-- See exactly which paths and content IDs are being picked up
+SELECT
+  r.reg_name,
+  r.reg_content_id,
+  p.reg_path_value,
+  r.reg_last_updated_time
+FROM   coct42_reg.reg_resource r
+JOIN   coct42_reg.reg_path p
+  ON   p.reg_path_id = r.reg_path_id
+WHERE  p.reg_path_value LIKE
+         '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/%'
+  AND  REGEXP_LIKE(p.reg_path_value,
+         '/(api|in|out|fault)$', 'i')
+  AND  r.reg_content_id IS NOT NULL
+ORDER BY p.reg_path_value;
