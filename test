@@ -1,95 +1,104 @@
-WITH params AS (
-  -- Change UUID here only
-  SELECT '5c663424-e253-44cb-b13a-965e59b65bf1' AS api_uuid
-  FROM   dual
-),
-base_path AS (
-  -- Build the base path prefix for this UUID
+API_NAME	API_VERSION	CONTEXT	STATUS	TENANT	UPDATED_TIME	SUSPENSION_LOGIC	ENDPOINT_CONFIG
+
+SUSPENSION_LOGIC
+Default suspension
+Suspension disabled (sequence file mention file name)
+Suspension disabled (endpointConfig)
+No registry entry
+Active suspension
+
+ENDPOINT_CONFIG
+if you found in api, then extract suspend portion content
+same for others
+if suspend no where find, then should be default
+
+I was using below query below, now combine with above query to serach with API_UUID then API and version
+
+WITH reg_apis AS (
   SELECT
-    '/_system/governance/apimgt/applicationdata/apis/'
-    || p.api_uuid                  AS base
-  FROM   params p
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/([0-9a-fA-F-]{36})/',
+      1, 1, NULL, 1)             AS api_uuid,
+    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+      1, 1, NULL, 1))            AS rev,
+    r.reg_content_id
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  r.reg_name = 'api'
+    AND  p.reg_path_value LIKE
+         '/_system/governance/apimgt/applicationdata/apis/%'
 ),
 latest_rev AS (
-  -- Find highest revision number under this UUID
   SELECT
-    MAX(TO_NUMBER(REGEXP_SUBSTR(
-      rp.reg_path_value,
-      '/([0-9]+)(/|$)',
-      1, 1, NULL, 1)))          AS rev
-  FROM   coct42_reg.reg_path rp
-  CROSS JOIN base_path bp
-  WHERE  rp.reg_path_value LIKE bp.base || '/%'
-),
-target_paths AS (
-  -- Build exact paths for api, in, out, fault
-  SELECT bp.base || '/' || lr.rev        AS target_path, 'api'   AS res_type FROM base_path bp CROSS JOIN latest_rev lr
-  UNION ALL
-  SELECT bp.base || '/' || lr.rev || '/in',    'in'    FROM base_path bp CROSS JOIN latest_rev lr
-  UNION ALL
-  SELECT bp.base || '/' || lr.rev || '/out',   'out'   FROM base_path bp CROSS JOIN latest_rev lr
-  UNION ALL
-  SELECT bp.base || '/' || lr.rev || '/fault', 'fault' FROM base_path bp CROSS JOIN latest_rev lr
+    api_uuid,
+    MAX(reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
+  FROM   reg_apis
+  WHERE  api_uuid IS NOT NULL
+  GROUP BY api_uuid
 ),
 decoded AS (
-  -- Join to get content and decode chunks
   SELECT
-    tp.res_type,
-    r.reg_name,
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 1))   AS chunk1,
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 2001)) AS chunk2,
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 4001)) AS chunk3
-  FROM   target_paths tp
-  JOIN   coct42_reg.reg_path rp
-    ON   rp.reg_path_value = tp.target_path
-  JOIN   coct42_reg.reg_resource r
-    ON   r.reg_path_id     = rp.reg_path_id
-    AND  r.reg_content_id  IS NOT NULL
-  JOIN   coct42_reg.reg_content c
-    ON   c.reg_content_id  = r.reg_content_id
+    lr.api_uuid,
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 6001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 8001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS clob_txt
+  FROM   latest_rev lr
+  LEFT JOIN coct42_reg.reg_content c
+    ON   c.reg_content_id = lr.reg_content_id
+),
+cleaned AS (
+  SELECT
+    d.api_uuid,
+    d.clob_txt,
+    REPLACE(
+      REPLACE(
+        REPLACE(
+          REPLACE(
+            REGEXP_SUBSTR(
+              d.clob_txt,
+              '<endpointConfig>.*?</endpointConfig>',
+              1, 1, 'n'
+            ),
+            CHR(10), ''
+          ),
+          CHR(13), ''
+        ),
+        CHR(9), ''
+      ),
+      '"', ''''
+    ) AS endpoint_config
+  FROM   decoded d
 )
 SELECT
-  res_type,
-  reg_name,
+  a.API_NAME,
+  a.API_VERSION,
+  a.CONTEXT,
+  a.STATUS,
+  a.ORGANIZATION                                  AS TENANT,
+  a.UPDATED_TIME,
   CASE
-    WHEN INSTR(UPPER(chunk1),'SUSPEND')>0
-      OR   INSTR(UPPER(chunk2),'SUSPEND')>0
-      OR   INSTR(UPPER(chunk3),'SUSPEND')>0
-      THEN 'Yes'
-    ELSE 'No'
-  END                             AS suspend_found,
-  CASE
-    WHEN INSTR(UPPER(chunk1),'SUSPEND')>0
-      THEN SUBSTR(chunk1,
-             GREATEST(INSTR(UPPER(chunk1),'SUSPEND')-20,1),300)
-    WHEN INSTR(UPPER(chunk2),'SUSPEND')>0
-      THEN SUBSTR(chunk2,
-             GREATEST(INSTR(UPPER(chunk2),'SUSPEND')-20,1),300)
-    WHEN INSTR(UPPER(chunk3),'SUSPEND')>0
-      THEN SUBSTR(chunk3,
-             GREATEST(INSTR(UPPER(chunk3),'SUSPEND')-20,1),300)
-    ELSE 'No suspend found'
-  END                             AS suspend_context,
-  CASE
-    WHEN INSTR(UPPER(chunk1),'CUSTOMSEQUENCES')>0
-      THEN SUBSTR(chunk1,
-             INSTR(UPPER(chunk1),'CUSTOMSEQUENCES'),200)
-    WHEN INSTR(UPPER(chunk2),'CUSTOMSEQUENCES')>0
-      THEN SUBSTR(chunk2,
-             INSTR(UPPER(chunk2),'CUSTOMSEQUENCES'),200)
-    WHEN INSTR(UPPER(chunk3),'CUSTOMSEQUENCES')>0
-      THEN SUBSTR(chunk3,
-             INSTR(UPPER(chunk3),'CUSTOMSEQUENCES'),200)
-    ELSE 'No global seq reference'
-  END                             AS global_seq_ref
-FROM   decoded
-ORDER BY
-  CASE res_type
-    WHEN 'api'   THEN 1
-    WHEN 'in'    THEN 2
-    WHEN 'out'   THEN 3
-    WHEN 'fault' THEN 4
-  END;
+    WHEN c.clob_txt IS NULL
+      THEN 'No registry entry'
+    WHEN INSTR(c.clob_txt, '"suspendMaxDuration":"0"') > 0
+      THEN 'Suspension effectively disabled'
+    WHEN INSTR(c.clob_txt, 'suspendErrorCode') > 0
+      THEN 'Active suspension'
+    ELSE 'Default suspension'
+  END                                             AS SUSPENSION_LOGIC,
+  c.endpoint_config
+FROM   COCT42_AM.AM_API a
+LEFT JOIN cleaned c
+  ON   a.API_UUID = c.api_uuid
+ORDER BY TENANT, SUSPENSION_LOGIC, a.API_NAME, a.API_VERSION;
