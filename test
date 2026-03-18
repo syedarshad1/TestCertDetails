@@ -1,30 +1,14 @@
--- Check provider path (API specific)
-SELECT
-  'Provider path'              AS location,
-  r.reg_name,
-  r.reg_content_id,
-  p.reg_path_value,
-  r.reg_last_updated_time
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-WHERE  p.reg_path_value LIKE
-         '/_system/governance/apimgt/applicationdata/provider/%/PaymentOrderManagement/5.1.4/%'
-
-UNION ALL
-
--- Check global customsequences path
-SELECT
-  'Global customsequences'     AS location,
-  r.reg_name,
-  r.reg_content_id,
-  p.reg_path_value,
-  r.reg_last_updated_time
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-WHERE  p.reg_path_value LIKE
-         '/_system/governance/apimgt/customsequences/%'
-  AND  r.reg_name LIKE '%pom%'
-
-ORDER BY location, reg_path_value, reg_name;
+Global customsequences	pom_api_request_in.xml	19149659	/_system/governance/apimgt/customsequences/in	16-MAR-26 03.24.09.274000000 PM
+Global customsequences	pom_token_gen_seq_in.xml	19149665	/_system/governance/apimgt/customsequences/in	16-MAR-26 03.24.09.453000000 PM
+Global customsequences	pom_api_response_out.xml	19149661	/_system/governance/apimgt/customsequences/out	16-MAR-26 03.24.09.323000000 PM
+Global customsequences	pom_token_gen_seq_out.xml	19149667	/_system/governance/apimgt/customsequences/out	16-MAR-26 03.24.09.521000000 PM
+Provider path	FIS-POM-API-User-Guide-5.1.4.pdf	15809653	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/documentation	09-AUG-25 10.39.59.243000000 AM
+Provider path			/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/documentation	04-DEC-20 09.04.41.527000000 AM
+Provider path	FIS-POM-API-User-Guide-5.1.4.pdf	15809659	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/documentation/files	09-AUG-25 10.39.59.550000000 AM
+Provider path			/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/documentation/files	04-DEC-20 09.04.41.533000000 AM
+Provider path	pom_common_fault	1781253	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/fault	04-DEC-20 09.04.43.436000000 AM
+Provider path			/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/fault	04-DEC-20 09.04.43.427000000 AM
+Provider path	pom_common_in	1781255	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/in	04-DEC-20 09.04.44.304000000 AM
+Provider path			/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/in	04-DEC-20 09.04.42.827000000 AM
+Provider path	pom_common_out	1781257	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/out	04-DEC-20 09.04.44.548000000 AM
+Provider path			/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/out	04-DEC-20 09.04.43.143000000 AM
