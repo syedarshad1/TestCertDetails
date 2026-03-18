@@ -1,15 +1,1 @@
-SELECT
-  MIN(DBMS_LOB.GETLENGTH(c.reg_content_data)) AS min_bytes,
-  MAX(DBMS_LOB.GETLENGTH(c.reg_content_data)) AS max_bytes,
-  ROUND(AVG(DBMS_LOB.GETLENGTH(c.reg_content_data))) AS avg_bytes,
-  COUNT(*)                      AS total_apis,
-  CEIL(MAX(DBMS_LOB.GETLENGTH(c.reg_content_data)) / 2000.0)
-                                  AS chunks_needed
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-JOIN   coct42_reg.reg_content c
-  ON   c.reg_content_id = r.reg_content_id
-WHERE  r.reg_name = 'api'
-  AND  p.reg_path_value LIKE
-         '/_system/governance/apimgt/applicationdata/apis/%';
+2034	29199	3663	4483	15
