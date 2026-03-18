@@ -5,8 +5,6 @@ WITH target_apis AS (
     AND  API_VERSION IN ('5.1.4', '1.1')
 ),
 latest_rev AS (
-  -- Simplified: just get latest content ID per API
-  -- using MAX(reg_content_id) as proxy for latest
   SELECT
     t.API_NAME,
     t.API_VERSION,
@@ -16,9 +14,10 @@ latest_rev AS (
     ON   r.reg_name = 'api'
   JOIN   coct42_reg.reg_path p
     ON   p.reg_path_id = r.reg_path_id
-  WHERE  p.reg_path_value LIKE
-           '/_system/governance/apimgt/applicationdata/apis/%'
-    AND  INSTR(p.reg_path_value, t.API_UUID) > 0
+  WHERE  DBMS_LOB.INSTR(
+           p.reg_path_value,
+           t.API_UUID
+         ) > 0
   GROUP BY t.API_NAME, t.API_VERSION
 ),
 api_blob AS (
