@@ -1,32 +1,4 @@
-WITH raw_chunks AS (
-  SELECT
-    a.API_UUID,
-    a.API_NAME,
-    a.API_VERSION,
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 1))   AS chunk1,
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 2001)) AS chunk2
-  FROM   COCT42_AM.AM_API a
-  JOIN   coct42_reg.reg_resource r
-    ON   r.reg_name = 'api'
-  JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id = r.reg_path_id
-    AND  p.reg_path_value LIKE
-           '/_system/governance/apimgt/applicationdata/apis/%'
-    AND  p.reg_path_value LIKE '%' || a.API_UUID || '%'
-  JOIN   coct42_reg.reg_content c
-    ON   c.reg_content_id = r.reg_content_id
-  WHERE  a.API_NAME    = 'P1D-CardManagement'
-    AND  a.API_VERSION = 'v9'
-)
-SELECT
-  API_UUID,
-  API_NAME,
-  API_VERSION,
-  -- Show just the endpointConfig block
-  SUBSTR(chunk1,
-    INSTR(chunk1, 'endpointConfig'),
-    500)                          AS ep_raw
-FROM   raw_chunks
-WHERE  INSTR(chunk1, 'endpointConfig') > 0;
+SELECT API_UUID, API_NAME, API_VERSION
+FROM   COCT42_AM.AM_API
+WHERE  API_NAME    = 'P1D-CardManagement'
+  AND  API_VERSION = 'v9';
