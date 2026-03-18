@@ -1,1 +1,11 @@
-1897	5c663424-e253-44cb-b13a-965e59b65bf1	PaymentOrderManagement	5.1.4	/t/aexp.com/rest/pom/5.1.4	aexp.com	PUBLISHED
+SELECT
+  r.reg_name,
+  r.reg_content_id,
+  p.reg_path_value,
+  r.reg_last_updated_time
+FROM   coct42_reg.reg_resource r
+JOIN   coct42_reg.reg_path p
+  ON   p.reg_path_id = r.reg_path_id
+WHERE  p.reg_path_value LIKE
+         '%PaymentOrderManagement%5.1.4%'
+ORDER BY p.reg_path_value, r.reg_name;
