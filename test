@@ -4,18 +4,25 @@ WITH raw_chunks AS (
       dbms_lob.substr(c.reg_content_data, 2000, 1))   AS chunk1
   FROM   coct42_reg.reg_resource r
   JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id = r.reg_path_id
+    ON   p.reg_path_id   = r.reg_path_id
     AND  p.reg_path_value LIKE
-           '/_system/governance/apimgt/applicationdata/apis/%'
-    AND  p.reg_path_value LIKE
-           '%<paste-uuid-here>%'
+           '/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/%'
   JOIN   coct42_reg.reg_content c
     ON   c.reg_content_id = r.reg_content_id
   WHERE  r.reg_name = 'api'
+    AND  r.reg_content_id = (
+           SELECT MAX(r2.reg_content_id)
+           FROM   coct42_reg.reg_resource r2
+           JOIN   coct42_reg.reg_path p2
+             ON   p2.reg_path_id   = r2.reg_path_id
+             AND  p2.reg_path_value LIKE
+                    '/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/%'
+           WHERE  r2.reg_name = 'api'
+         )
 ),
 ep_block AS (
-  -- Extract production_endpoints block from chunk1
   SELECT
+    chunk1,
     SUBSTR(chunk1,
       INSTR(chunk1, 'production_endpoints'),
       INSTR(chunk1, '}}',
@@ -27,40 +34,11 @@ ep_block AS (
 )
 SELECT
   prod_block,
-  -- URL uses single quote pattern 'url':' 
-  REPLACE(
-    SUBSTR(prod_block,
-      INSTR(prod_block, 'url'':''') + 7,
-      INSTR(prod_block, '''',
-        INSTR(prod_block, 'url'':''') + 7) -
-      INSTR(prod_block, 'url'':''') - 7),
-  '\/', '/')                     AS production_url,
-  -- timeout
+  -- show raw url area to verify quote style
   SUBSTR(prod_block,
-    INSTR(prod_block, 'actionDuration'':''') + 17,
-    INSTR(prod_block, '''',
-      INSTR(prod_block, 'actionDuration'':''') + 17) -
-    INSTR(prod_block, 'actionDuration'':''') - 17)
-                                  AS timeout_ms,
-  -- suspendDuration
+    INSTR(prod_block, 'url'), 60)  AS url_raw,
+  -- show raw suspend area
   SUBSTR(prod_block,
-    INSTR(prod_block, 'suspendDuration'':''') + 18,
-    INSTR(prod_block, '''',
-      INSTR(prod_block, 'suspendDuration'':''') + 18) -
-    INSTR(prod_block, 'suspendDuration'':''') - 18)
-                                  AS suspend_duration,
-  -- suspendMaxDuration
-  SUBSTR(prod_block,
-    INSTR(prod_block, 'suspendMaxDuration'':''') + 21,
-    INSTR(prod_block, '''',
-      INSTR(prod_block, 'suspendMaxDuration'':''') + 21) -
-    INSTR(prod_block, 'suspendMaxDuration'':''') - 21)
-                                  AS suspend_max_duration,
-  -- suspendErrorCode
-  SUBSTR(prod_block,
-    INSTR(prod_block, 'suspendErrorCode'':[') + 19,
-    INSTR(prod_block, ']',
-      INSTR(prod_block, 'suspendErrorCode'':[') + 19) -
-    INSTR(prod_block, 'suspendErrorCode'':[') - 19)
-                                  AS suspend_error_code
+    GREATEST(INSTR(prod_block, 'suspend')-5, 1),
+    150)                          AS suspend_raw
 FROM   ep_block;
