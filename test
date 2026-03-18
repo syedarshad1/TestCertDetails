@@ -1,27 +1,22 @@
 WITH target_apis AS (
-  SELECT API_ID, API_UUID, API_NAME, API_VERSION
+  SELECT API_UUID, API_NAME, API_VERSION
   FROM   COCT42_AM.AM_API
   WHERE  API_NAME    = 'PaymentOrderManagement'
     AND  API_VERSION IN ('5.1.4', '1.1')
 ),
 latest_rev AS (
-  -- Get latest api blob content ID per UUID
-  -- Use INSTR to avoid CLOB concatenation issues
+  -- Simplified: just get latest content ID per API
+  -- using MAX(reg_content_id) as proxy for latest
   SELECT
     t.API_NAME,
     t.API_VERSION,
-    MAX(r.reg_content_id) KEEP
-      (DENSE_RANK LAST ORDER BY
-        TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
-          '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
-          1, 1, NULL, 1))
-      ) AS reg_content_id
+    MAX(r.reg_content_id) AS reg_content_id
   FROM   target_apis t
   JOIN   coct42_reg.reg_resource r
     ON   r.reg_name = 'api'
   JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id    = r.reg_path_id
-    AND  p.reg_path_value LIKE
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  p.reg_path_value LIKE
            '/_system/governance/apimgt/applicationdata/apis/%'
     AND  INSTR(p.reg_path_value, t.API_UUID) > 0
   GROUP BY t.API_NAME, t.API_VERSION
