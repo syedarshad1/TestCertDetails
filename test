@@ -1,9 +1,24 @@
-just I want to search suspend keywork, pull the config details for all the api (<endpointConfig>gettheconfigdetails<endpointConfig>)
+Empty value mean Default Suspesion
 
-if no suspend keyword found, then it mean "default suspension". (Hope you are searching in api/in/out/fault). - Print the config (<endpointConfig>gettheconfigdetails<endpointConfig>)
-  If you find in/out/fault then it is "custom sequence(suspension)" - need to check if it Active Suspension or Suspension Disabled ('suspendDuration':'0' or 'suspendDuration':'0') - Print the config (<endpointConfig>gettheconfigdetails<endpointConfig>)
-  if you find in api, then check it is "Active Suspension" - need to check if it Active Suspension or Suspension disabled ('suspendDuration':'0' or 'suspendDuration':'0') - Print the config (<endpointConfig>gettheconfigdetails<endpointConfig>)
+"suspendDuration": "",
+"suspendErrorCode": [],
+"suspendMaxDuration": ""
 
-Another logic here, you already have the config now I need you to pull 'actionDuration':'30000' could be any value, if no value print globaltimeout 120000ms
+'url':'default' -> Default Value
 
-I am checking you are doing this right, do not write the query just confirm me the logic.
+------------------------------------------
+Explicit Disable(For All Errors Codes)
+
+"suspendDuration": "0",
+"suspendErrorCode": ["-1"],
+"suspendMaxDuration": "0"
+
+-----------------------------------------
+Explicit Disable(For Specific Error Code)
+
+"suspendDuration": "0",
+"suspendErrorCode": ["101508"],
+"actionDuration": "30000",
+"retryErroCode": [],
+"factor": "1.0",
+"suspendMaxDuration": "0"
