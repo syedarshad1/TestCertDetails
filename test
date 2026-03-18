@@ -4,7 +4,7 @@ WITH raw AS (
       dbms_lob.substr(c.reg_content_data, 2000, 1))   AS chunk1,
     utl_raw.cast_to_varchar2(
       dbms_lob.substr(c.reg_content_data, 2000, 2001)) AS chunk2
-  FROM   COCT42_REG.REG_CONTENT c   -- update schema if different
+  FROM   coct42_reg.reg_content c
   WHERE  c.reg_content_id = 18560005
 ),
 ep AS (
