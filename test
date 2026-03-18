@@ -1,12 +1,23 @@
--- See all paths and resources stored under this UUID
-SELECT
-  r.reg_name,
-  r.reg_content_id,
-  p.reg_path_value,
-  r.reg_last_updated_time
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-WHERE  p.reg_path_value LIKE
-         '%5a1bffee-bafc-4f72-acec-d2275ecad872%'
-ORDER BY p.reg_path_value, r.reg_name;
+		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872	08-FEB-26 02.56.27.615000000 AM
+api	18558197	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/1	08-FEB-26 02.56.27.661000000 AM
+swagger.json	18558199	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/1	08-FEB-26 02.56.27.750000000 AM
+		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/1	08-FEB-26 02.56.27.621000000 AM
+api	18559865	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2	08-FEB-26 04.22.21.955000000 AM
+swagger.json	18559867	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2	08-FEB-26 04.22.22.170000000 AM
+		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2	08-FEB-26 04.22.21.919000000 AM
+Card Add	18559869	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.358000000 AM
+Card Delete	18559871	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.426000000 AM
+Card Inquiry	18559873	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.475000000 AM
+Card Reissue	18559875	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.528000000 AM
+Card Replace	18559877	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.576000000 AM
+Card Update	18559879	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.698000000 AM
+P1D Card Management V9 Release Notes	18559881	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.768000000 AM
+		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation	08-FEB-26 04.22.22.322000000 AM
+P1D-CardManagement-V9-ReleaseNotes.pdf	18559883	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation/files	08-FEB-26 04.22.22.901000000 AM
+		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/2/documentation/files	08-FEB-26 04.22.22.821000000 AM
+api	18560005	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/3	08-FEB-26 04.27.14.409000000 AM
+swagger.json	18560007	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/3	08-FEB-26 04.27.14.495000000 AM
+		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/3	08-FEB-26 04.27.14.375000000 AM
+		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/3/documentation	08-FEB-26 04.27.14.553000000 AM
+P1D-CardManagement-V9-ReleaseNotes.pdf	18560009	/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/3/documentation/files	08-FEB-26 04.27.14.660000000 AM
+		/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/3/documentation/files	08-FEB-26 04.27.14.602000000 AM
