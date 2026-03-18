@@ -1,4 +1,32 @@
-SELECT owner, table_name
-FROM   all_tables
-WHERE  table_name = 'REG_CONTENT'
-ORDER BY owner;
+WITH raw AS (
+  SELECT
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1))   AS chunk1,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001)) AS chunk2
+  FROM   COCT42_REG.REG_CONTENT c   -- update schema if different
+  WHERE  c.reg_content_id = 18560005
+),
+ep AS (
+  SELECT
+    CASE
+      WHEN INSTR(chunk1, 'production_endpoints') > 0
+        THEN SUBSTR(chunk1,
+               INSTR(chunk1, 'production_endpoints'),
+               500)
+      WHEN INSTR(chunk2, 'production_endpoints') > 0
+        THEN SUBSTR(chunk2,
+               INSTR(chunk2, 'production_endpoints'),
+               500)
+    END                           AS prod_block
+  FROM   raw
+)
+SELECT
+  prod_block,
+  SUBSTR(prod_block,
+    INSTR(prod_block, 'url'), 80)  AS url_area,
+  SUBSTR(prod_block,
+    GREATEST(INSTR(prod_block, 'suspend')-5, 1),
+    200)                          AS suspend_area
+FROM   ep
+WHERE  prod_block IS NOT NULL;
