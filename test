@@ -1,5 +1,66 @@
 SELECT
-  c.reg_content_id,
-  DBMS_LOB.GETLENGTH(c.reg_content_data) AS blob_size_bytes
+  CASE
+    WHEN INSTR(utl_raw.cast_to_varchar2(
+           dbms_lob.substr(c.reg_content_data,2000,1)),
+         'endpointConfig') > 0
+      THEN 'chunk1 (bytes 1-2000)'
+    WHEN INSTR(utl_raw.cast_to_varchar2(
+           dbms_lob.substr(c.reg_content_data,2000,2001)),
+         'endpointConfig') > 0
+      THEN 'chunk2 (bytes 2001-4000)'
+    WHEN INSTR(utl_raw.cast_to_varchar2(
+           dbms_lob.substr(c.reg_content_data,2000,4001)),
+         'endpointConfig') > 0
+      THEN 'chunk3 (bytes 4001-6000)'
+    WHEN INSTR(utl_raw.cast_to_varchar2(
+           dbms_lob.substr(c.reg_content_data,2000,6001)),
+         'endpointConfig') > 0
+      THEN 'chunk4 (bytes 6001-8000)'
+    WHEN INSTR(utl_raw.cast_to_varchar2(
+           dbms_lob.substr(c.reg_content_data,2000,8001)),
+         'endpointConfig') > 0
+      THEN 'chunk5 (bytes 8001-10000)'
+    WHEN INSTR(utl_raw.cast_to_varchar2(
+           dbms_lob.substr(c.reg_content_data,2000,10001)),
+         'endpointConfig') > 0
+      THEN 'chunk6 (bytes 10001-12000)'
+    ELSE 'Not found in first 12000 bytes'
+  END                             AS found_in_chunk,
+  -- Also show the content from whichever chunk has it
+  CASE
+    WHEN INSTR(utl_raw.cast_to_varchar2(
+           dbms_lob.substr(c.reg_content_data,2000,1)),
+         'endpointConfig') > 0
+      THEN SUBSTR(utl_raw.cast_to_varchar2(
+             dbms_lob.substr(c.reg_content_data,2000,1)),
+           INSTR(utl_raw.cast_to_varchar2(
+             dbms_lob.substr(c.reg_content_data,2000,1)),
+           'endpointConfig'), 600)
+    WHEN INSTR(utl_raw.cast_to_varchar2(
+           dbms_lob.substr(c.reg_content_data,2000,2001)),
+         'endpointConfig') > 0
+      THEN SUBSTR(utl_raw.cast_to_varchar2(
+             dbms_lob.substr(c.reg_content_data,2000,2001)),
+           INSTR(utl_raw.cast_to_varchar2(
+             dbms_lob.substr(c.reg_content_data,2000,2001)),
+           'endpointConfig'), 600)
+    WHEN INSTR(utl_raw.cast_to_varchar2(
+           dbms_lob.substr(c.reg_content_data,2000,4001)),
+         'endpointConfig') > 0
+      THEN SUBSTR(utl_raw.cast_to_varchar2(
+             dbms_lob.substr(c.reg_content_data,2000,4001)),
+           INSTR(utl_raw.cast_to_varchar2(
+             dbms_lob.substr(c.reg_content_data,2000,4001)),
+           'endpointConfig'), 600)
+    WHEN INSTR(utl_raw.cast_to_varchar2(
+           dbms_lob.substr(c.reg_content_data,2000,6001)),
+         'endpointConfig') > 0
+      THEN SUBSTR(utl_raw.cast_to_varchar2(
+             dbms_lob.substr(c.reg_content_data,2000,6001)),
+           INSTR(utl_raw.cast_to_varchar2(
+             dbms_lob.substr(c.reg_content_data,2000,6001)),
+           'endpointConfig'), 600)
+    ELSE 'Not found'
+  END                             AS endpoint_config_raw
 FROM   coct42_reg.reg_content c
 WHERE  c.reg_content_id = 18560005;
