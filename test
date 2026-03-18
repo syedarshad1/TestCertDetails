@@ -29,21 +29,21 @@ api_blob AS (
   SELECT
     lr.api_uuid,
     lr.latest_rev,
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,1)))     ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,2001)))   ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,4001)))   ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,6001)))   ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,8001)))   ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,10001)))  ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,12001)))  ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,14001)))  ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,16001)))  ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,18001)))  ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,20001)))  ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,22001)))  ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,24001)))  ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,26001)))  ||
-    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,28001)))  AS clob_txt
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,1)))    ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,2001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,4001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,6001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,8001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,10001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,12001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,14001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,16001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,18001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,20001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,22001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,24001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,26001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,28001))) AS clob_txt
   FROM   latest_rev lr
   LEFT JOIN coct42_reg.reg_content c
     ON   c.reg_content_id = lr.reg_content_id
@@ -61,53 +61,75 @@ endpoint_config AS (
   FROM   api_blob
 ),
 ep_block AS (
-  -- Extract production_endpoints block from CLOB
+  -- Extract production_endpoints block as VARCHAR2
+  -- Use DBMS_LOB.INSTR + DBMS_LOB.SUBSTR on CLOB safely
   SELECT
     api_uuid,
-    REGEXP_SUBSTR(clob_txt,
-      '"production_endpoints"\s*:\s*\{[^}]*\}',
-      1, 1, 'n')                 AS prod_block_outer,
-    REGEXP_SUBSTR(clob_txt,
-      '"production_endpoints".*?"config"\s*:\s*\{[^}]*\}',
-      1, 1, 'n')                 AS prod_config_block
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(
+        clob_txt,
+        -- length: 800 chars from production_endpoints start
+        800,
+        -- offset: position of production_endpoints in CLOB
+        DBMS_LOB.INSTR(clob_txt, 'production_endpoints')
+      )
+    )                             AS prod_block
   FROM   endpoint_config
+  WHERE  DBMS_LOB.INSTR(clob_txt, 'production_endpoints') > 0
 ),
 ep_parsed AS (
-  -- Extract production URL and timeout from config block
   SELECT
     api_uuid,
     -- Production URL
     REPLACE(
-      REGEXP_SUBSTR(prod_block_outer,
-        '"url"\s*:\s*"([^"]+)"',
-        1, 1, 'n', 1),
+      SUBSTR(prod_block,
+        INSTR(prod_block, 'url":"') + 6,
+        INSTR(prod_block, '"',
+          INSTR(prod_block, 'url":"') + 6) -
+        INSTR(prod_block, 'url":"') - 6),
     '\/', '/')                    AS production_url,
-    -- actionDuration (timeout) from config block
+    -- actionDuration (timeout)
     CASE
-      WHEN REGEXP_SUBSTR(prod_config_block,
-             '"actionDuration"\s*:\s*"([^"]+)"',
-             1, 1, 'n', 1) IS NOT NULL
-        THEN REGEXP_SUBSTR(prod_config_block,
-               '"actionDuration"\s*:\s*"([^"]+)"',
-               1, 1, 'n', 1)
+      WHEN INSTR(prod_block, 'actionDuration":"') > 0
+        THEN SUBSTR(prod_block,
+               INSTR(prod_block, 'actionDuration":"') + 17,
+               INSTR(prod_block, '"',
+                 INSTR(prod_block, 'actionDuration":"') + 17) -
+               INSTR(prod_block, 'actionDuration":"') - 17)
       ELSE '120000 (synapse global default)'
     END                           AS timeout_ms,
     -- suspendDuration
-    REGEXP_SUBSTR(prod_config_block,
-      '"suspendDuration"\s*:\s*"([^"]+)"',
-      1, 1, 'n', 1)               AS suspend_duration,
+    CASE WHEN INSTR(prod_block,'suspendDuration":"')>0
+      THEN SUBSTR(prod_block,
+             INSTR(prod_block,'suspendDuration":"')+18,
+             INSTR(prod_block,'"',
+               INSTR(prod_block,'suspendDuration":"')+18)-
+             INSTR(prod_block,'suspendDuration":"')-18)
+    END                           AS suspend_duration,
     -- suspendMaxDuration
-    REGEXP_SUBSTR(prod_config_block,
-      '"suspendMaxDuration"\s*:\s*"([^"]+)"',
-      1, 1, 'n', 1)               AS suspend_max_duration,
+    CASE WHEN INSTR(prod_block,'suspendMaxDuration":"')>0
+      THEN SUBSTR(prod_block,
+             INSTR(prod_block,'suspendMaxDuration":"')+21,
+             INSTR(prod_block,'"',
+               INSTR(prod_block,'suspendMaxDuration":"')+21)-
+             INSTR(prod_block,'suspendMaxDuration":"')-21)
+    END                           AS suspend_max_duration,
     -- suspendErrorCode
-    REGEXP_SUBSTR(prod_config_block,
-      '"suspendErrorCode"\s*:\s*\[([^\]]+)\]',
-      1, 1, 'n', 1)               AS suspend_error_code,
+    CASE WHEN INSTR(prod_block,'suspendErrorCode":["')>0
+      THEN SUBSTR(prod_block,
+             INSTR(prod_block,'suspendErrorCode":["')+20,
+             INSTR(prod_block,'"',
+               INSTR(prod_block,'suspendErrorCode":["')+20)-
+             INSTR(prod_block,'suspendErrorCode":["')-20)
+    END                           AS suspend_error_code,
     -- actionSelect
-    REGEXP_SUBSTR(prod_config_block,
-      '"actionSelect"\s*:\s*"([^"]+)"',
-      1, 1, 'n', 1)               AS action_select
+    CASE WHEN INSTR(prod_block,'actionSelect":"')>0
+      THEN SUBSTR(prod_block,
+             INSTR(prod_block,'actionSelect":"')+15,
+             INSTR(prod_block,'"',
+               INSTR(prod_block,'actionSelect":"')+15)-
+             INSTR(prod_block,'actionSelect":"')-15)
+    END                           AS action_select
   FROM   ep_block
 ),
 seq_resources AS (
@@ -206,13 +228,12 @@ SELECT
     ss.suspend_context,
   CHR(10),' '),CHR(13),''),CHR(9),' ')
                                   AS SEQUENCE_SUSPEND_BLOCK,
-  COALESCE(ep.production_url,      'Not found') AS PRODUCTION_URL,
-  COALESCE(ep.timeout_ms,          '120000 (synapse global default)')
-                                  AS TIMEOUT_MS,
-  COALESCE(ep.suspend_duration,    'Not set')   AS SUSPEND_DURATION,
-  COALESCE(ep.suspend_max_duration,'Not set')   AS SUSPEND_MAX_DURATION,
-  COALESCE(ep.suspend_error_code,  'Not set')   AS SUSPEND_ERROR_CODE,
-  COALESCE(ep.action_select,       'Not set')   AS ACTION_SELECT
+  COALESCE(ep.production_url,      'Not found')              AS PRODUCTION_URL,
+  COALESCE(ep.timeout_ms,          '120000 (synapse global default)') AS TIMEOUT_MS,
+  COALESCE(ep.suspend_duration,    'Not set')                AS SUSPEND_DURATION,
+  COALESCE(ep.suspend_max_duration,'Not set')                AS SUSPEND_MAX_DURATION,
+  COALESCE(ep.suspend_error_code,  'Not set')                AS SUSPEND_ERROR_CODE,
+  COALESCE(ep.action_select,       'Not set')                AS ACTION_SELECT
 FROM   COCT42_AM.AM_API a
 LEFT JOIN endpoint_config ec
   ON   ec.api_uuid = a.API_UUID
