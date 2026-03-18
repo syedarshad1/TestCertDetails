@@ -1,1 +1,223 @@
-2034	29199	3663	4483	15
+WITH reg_apis AS (
+  SELECT
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/([0-9a-fA-F-]{36})/',
+      1, 1, NULL, 1)             AS api_uuid,
+    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+      1, 1, NULL, 1))            AS rev,
+    r.reg_content_id
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  r.reg_name = 'api'
+    AND  p.reg_path_value LIKE
+         '/_system/governance/apimgt/applicationdata/apis/%'
+),
+latest_rev AS (
+  SELECT
+    api_uuid,
+    MAX(rev)                      AS latest_rev,
+    MAX(reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
+  FROM   reg_apis
+  WHERE  api_uuid IS NOT NULL
+  GROUP BY api_uuid
+),
+api_blob AS (
+  -- 15 chunks x 2000 = 30000 bytes covers max blob of 29199
+  SELECT
+    lr.api_uuid,
+    lr.latest_rev,
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,1)))     ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,2001)))   ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,4001)))   ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,6001)))   ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,8001)))   ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,10001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,12001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,14001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,16001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,18001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,20001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,22001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,24001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,26001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,28001)))  AS clob_txt
+  FROM   latest_rev lr
+  LEFT JOIN coct42_reg.reg_content c
+    ON   c.reg_content_id = lr.reg_content_id
+),
+endpoint_config AS (
+  SELECT
+    api_uuid,
+    clob_txt,
+    REPLACE(REPLACE(REPLACE(REPLACE(
+      REGEXP_SUBSTR(clob_txt,
+        '<endpointConfig>.*?</endpointConfig>',
+        1, 1, 'n'),
+    CHR(10),''),CHR(13),''),CHR(9),''),'"','''')
+    AS endpoint_config_raw
+  FROM   api_blob
+),
+ep_block AS (
+  -- Extract production_endpoints block from CLOB
+  SELECT
+    api_uuid,
+    REGEXP_SUBSTR(clob_txt,
+      '"production_endpoints"\s*:\s*\{[^}]*\}',
+      1, 1, 'n')                 AS prod_block_outer,
+    REGEXP_SUBSTR(clob_txt,
+      '"production_endpoints".*?"config"\s*:\s*\{[^}]*\}',
+      1, 1, 'n')                 AS prod_config_block
+  FROM   endpoint_config
+),
+ep_parsed AS (
+  -- Extract production URL and timeout from config block
+  SELECT
+    api_uuid,
+    -- Production URL
+    REPLACE(
+      REGEXP_SUBSTR(prod_block_outer,
+        '"url"\s*:\s*"([^"]+)"',
+        1, 1, 'n', 1),
+    '\/', '/')                    AS production_url,
+    -- actionDuration (timeout) from config block
+    CASE
+      WHEN REGEXP_SUBSTR(prod_config_block,
+             '"actionDuration"\s*:\s*"([^"]+)"',
+             1, 1, 'n', 1) IS NOT NULL
+        THEN REGEXP_SUBSTR(prod_config_block,
+               '"actionDuration"\s*:\s*"([^"]+)"',
+               1, 1, 'n', 1)
+      ELSE '120000 (synapse global default)'
+    END                           AS timeout_ms,
+    -- suspendDuration
+    REGEXP_SUBSTR(prod_config_block,
+      '"suspendDuration"\s*:\s*"([^"]+)"',
+      1, 1, 'n', 1)               AS suspend_duration,
+    -- suspendMaxDuration
+    REGEXP_SUBSTR(prod_config_block,
+      '"suspendMaxDuration"\s*:\s*"([^"]+)"',
+      1, 1, 'n', 1)               AS suspend_max_duration,
+    -- suspendErrorCode
+    REGEXP_SUBSTR(prod_config_block,
+      '"suspendErrorCode"\s*:\s*\[([^\]]+)\]',
+      1, 1, 'n', 1)               AS suspend_error_code,
+    -- actionSelect
+    REGEXP_SUBSTR(prod_config_block,
+      '"actionSelect"\s*:\s*"([^"]+)"',
+      1, 1, 'n', 1)               AS action_select
+  FROM   ep_block
+),
+seq_resources AS (
+  SELECT
+    lr.api_uuid,
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/(in|out|fault)$',
+      1, 1, 'i', 1)             AS res_type,
+    r.reg_name                   AS seq_name,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data,2000,1))    AS chunk1,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data,2000,2001))  AS chunk2,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data,2000,4001))  AS chunk3
+  FROM   latest_rev lr
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_value IN (
+           '/_system/governance/apimgt/applicationdata/apis/'
+             || lr.api_uuid || '/' || lr.latest_rev || '/in',
+           '/_system/governance/apimgt/applicationdata/apis/'
+             || lr.api_uuid || '/' || lr.latest_rev || '/out',
+           '/_system/governance/apimgt/applicationdata/apis/'
+             || lr.api_uuid || '/' || lr.latest_rev || '/fault'
+         )
+  JOIN   coct42_reg.reg_resource r
+    ON   r.reg_path_id    = p.reg_path_id
+    AND  r.reg_content_id IS NOT NULL
+  JOIN   coct42_reg.reg_content c
+    ON   c.reg_content_id = r.reg_content_id
+),
+seq_suspend AS (
+  SELECT
+    api_uuid,
+    MAX(seq_name) KEEP
+      (DENSE_RANK FIRST ORDER BY
+        CASE res_type
+          WHEN 'in'    THEN 1
+          WHEN 'out'   THEN 2
+          WHEN 'fault' THEN 3
+        END)                        AS seq_name,
+    MAX(
+      CASE
+        WHEN INSTR(UPPER(chunk1),'SUSPEND')>0
+          THEN SUBSTR(chunk1,
+                 GREATEST(INSTR(UPPER(chunk1),'SUSPEND')-20,1),300)
+        WHEN INSTR(UPPER(chunk2),'SUSPEND')>0
+          THEN SUBSTR(chunk2,
+                 GREATEST(INSTR(UPPER(chunk2),'SUSPEND')-20,1),300)
+        WHEN INSTR(UPPER(chunk3),'SUSPEND')>0
+          THEN SUBSTR(chunk3,
+                 GREATEST(INSTR(UPPER(chunk3),'SUSPEND')-20,1),300)
+      END
+    ) KEEP (DENSE_RANK FIRST ORDER BY
+        CASE res_type
+          WHEN 'in'    THEN 1
+          WHEN 'out'   THEN 2
+          WHEN 'fault' THEN 3
+        END)                        AS suspend_context,
+    MAX(
+      CASE
+        WHEN INSTR(UPPER(chunk1),'SUSPEND')>0
+          OR   INSTR(UPPER(chunk2),'SUSPEND')>0
+          OR   INSTR(UPPER(chunk3),'SUSPEND')>0
+          THEN 1 ELSE 0
+      END)                          AS has_suspend
+  FROM   seq_resources
+  GROUP BY api_uuid
+)
+SELECT
+  a.API_NAME,
+  a.API_VERSION,
+  a.CONTEXT,
+  a.STATUS,
+  a.ORGANIZATION                  AS TENANT,
+  a.UPDATED_TIME,
+  CASE
+    WHEN ec.clob_txt IS NULL
+      THEN 'No registry entry'
+    WHEN ss.has_suspend = 1
+      AND INSTR(UPPER(ss.suspend_context),'MAXIMUMDURATION>0')>0
+      THEN 'Suspension disabled (sequence: '||ss.seq_name||')'
+    WHEN ss.has_suspend = 1
+      AND INSTR(UPPER(ss.suspend_context),'ERRORCODES>-1')>0
+      THEN 'Suspension disabled (sequence: '||ss.seq_name||')'
+    WHEN ss.has_suspend = 1
+      THEN 'Active suspension (sequence: '||ss.seq_name||')'
+    WHEN INSTR(ec.clob_txt,'"suspendMaxDuration":"0"')>0
+      THEN 'Suspension disabled (endpointConfig)'
+    WHEN INSTR(ec.clob_txt,'suspendErrorCode')>0
+      THEN 'Active suspension (endpointConfig)'
+    ELSE 'Default suspension'
+  END                             AS SUSPENSION_LOGIC,
+  ec.endpoint_config_raw          AS ENDPOINT_CONFIG,
+  REPLACE(REPLACE(REPLACE(
+    ss.suspend_context,
+  CHR(10),' '),CHR(13),''),CHR(9),' ')
+                                  AS SEQUENCE_SUSPEND_BLOCK,
+  COALESCE(ep.production_url,      'Not found') AS PRODUCTION_URL,
+  COALESCE(ep.timeout_ms,          '120000 (synapse global default)')
+                                  AS TIMEOUT_MS,
+  COALESCE(ep.suspend_duration,    'Not set')   AS SUSPEND_DURATION,
+  COALESCE(ep.suspend_max_duration,'Not set')   AS SUSPEND_MAX_DURATION,
+  COALESCE(ep.suspend_error_code,  'Not set')   AS SUSPEND_ERROR_CODE,
+  COALESCE(ep.action_select,       'Not set')   AS ACTION_SELECT
+FROM   COCT42_AM.AM_API a
+LEFT JOIN endpoint_config ec
+  ON   ec.api_uuid = a.API_UUID
+LEFT JOIN ep_parsed ep
+  ON   ep.api_uuid = a.API_UUID
+LEFT JOIN seq_suspend ss
+  ON   ss.api_uuid = a.API_UUID
+ORDER BY TENANT, SUSPENSION_LOGIC, a.API_NAME, a.API_VERSION;
