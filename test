@@ -1,5 +1,37 @@
-pom_common_fault	15809679	/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/fault	09-AUG-25 10.40.00.677000000 AM
-pom_common_in	15809683	/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/in	09-AUG-25 10.40.00.780000000 AM
-pom_common_out	15809685	/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/out	09-AUG-25 10.40.00.894000000 AM
-
-you hardcoded /2/ also reg_name api I am not seeing it
+WITH latest_rev AS (
+  SELECT
+    MAX(TO_NUMBER(REGEXP_SUBSTR(
+      p.reg_path_value,
+      '/apis/5c663424-e253-44cb-b13a-965e59b65bf1/([0-9]+)',
+      1, 1, NULL, 1)))          AS rev
+  FROM   coct42_reg.reg_path p
+  WHERE  p.reg_path_value LIKE
+           '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/%'
+)
+SELECT
+  r.reg_name,
+  r.reg_content_id,
+  p.reg_path_value,
+  r.reg_last_updated_time
+FROM   coct42_reg.reg_resource r
+JOIN   coct42_reg.reg_path p
+  ON   p.reg_path_id = r.reg_path_id
+CROSS JOIN latest_rev lr
+WHERE  (
+         -- api sits at /UUID/rev exactly
+         p.reg_path_value =
+           '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/'
+           || lr.rev
+      OR
+         -- in, out, fault sit at /UUID/rev/type
+         p.reg_path_value IN (
+           '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/'
+             || lr.rev || '/in',
+           '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/'
+             || lr.rev || '/out',
+           '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/'
+             || lr.rev || '/fault'
+         )
+       )
+  AND  r.reg_content_id IS NOT NULL
+ORDER BY p.reg_path_value;
