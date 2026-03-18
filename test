@@ -1,3 +1,15 @@
 <send receive="gov:/apimgt/customsequences/out/pom_token_gen_seq_out.xml">
 <endpoint>
 <http method="get" uri-template="{uri.var.idp}">
+<suspendOnFailure>
+<errorCodes>-1</errorCodes>
+<initialDuration>0</initialDuration>
+<progressionFactor>1.0</progressionFactor>
+<maximumDuration>0</maximumDuration>
+</suspendOnFailure>
+<markForSuspension>
+<errorCodes>-1</errorCodes>
+</markForSuspension>
+</http>
+</endpoint>
+</send>
