@@ -1,5 +1,57 @@
-ORA-00932: inconsistent datatypes: expected CHAR got CLOB
-00932. 00000 -  "inconsistent datatypes: expected %s got %s"
-*Cause:    
-*Action:
-Error at Line: 345 Column: 5
+api_analysis AS (
+  SELECT
+    api_uuid,
+    clob_txt,
+    -- endpointConfig — SUBSTR to VARCHAR2 max 4000
+    SUBSTR(
+      REPLACE(REPLACE(REPLACE(REPLACE(
+        REGEXP_SUBSTR(clob_txt,
+          CHR(60)||'endpointConfig'||CHR(62)||
+          '.*?'||
+          CHR(60)||'/endpointConfig'||CHR(62),
+          1, 1, 'n'),
+      CHR(10),''),CHR(13),''),CHR(9),''),'"',''''),
+    1, 4000)                      AS api_endpoint_config,
+    CASE
+      WHEN DBMS_LOB.INSTR(UPPER(clob_txt),'SUSPEND')>0
+        THEN 1 ELSE 0
+    END                           AS api_has_suspend,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,'suspendDuration":"0"')>0
+        OR   DBMS_LOB.INSTR(clob_txt,
+               'suspendDuration'||CHR(62)||'0'||CHR(60))>0
+        THEN 1 ELSE 0
+    END                           AS api_suspend_dur_zero,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,'suspendMaxDuration":"0"')>0
+        OR   DBMS_LOB.INSTR(clob_txt,
+               'suspendMaxDuration'||CHR(62)||'0'||CHR(60))>0
+        THEN 1 ELSE 0
+    END                           AS api_suspend_max_zero,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,'"-1"')>0
+        OR   DBMS_LOB.INSTR(clob_txt,
+               'errorCodes'||CHR(62)||'-1'||CHR(60))>0
+        THEN 1 ELSE 0
+    END                           AS api_error_minus1,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,'suspendErrorCode')>0
+        THEN 1 ELSE 0
+    END                           AS api_has_error_code,
+    -- actionDuration from api blob — cast to VARCHAR2
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,'actionDuration":"')>0
+        THEN SUBSTR(
+               utl_raw.cast_to_varchar2(
+                 dbms_lob.substr(clob_txt, 30,
+                   DBMS_LOB.INSTR(clob_txt,'actionDuration":"')+17)),
+               1,
+               INSTR(
+                 utl_raw.cast_to_varchar2(
+                   dbms_lob.substr(clob_txt, 30,
+                     DBMS_LOB.INSTR(clob_txt,'actionDuration":"')+17)),
+                 '"') - 1)
+      ELSE NULL
+    END                           AS api_action_duration
+  FROM   api_blob
+),
