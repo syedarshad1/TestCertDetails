@@ -1,11 +1,13 @@
-SELECT
-  r.reg_name,
-  r.reg_content_id,
-  p.reg_path_value,
-  r.reg_last_updated_time
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-WHERE  p.reg_path_value LIKE
-         '%PaymentOrderManagement%5.1.4%'
-ORDER BY p.reg_path_value, r.reg_name;
+api	15809645	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4	09-AUG-25 10.39.58.808000000 AM
+swagger.json	15809649	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4	09-AUG-25 10.39.59.027000000 AM
+		/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4	04-DEC-20 09.04.39.107000000 AM
+FIS-POM-API-User-Guide-5.1.4.pdf	15809653	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/documentation	09-AUG-25 10.39.59.243000000 AM
+		/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/documentation	04-DEC-20 09.04.41.527000000 AM
+FIS-POM-API-User-Guide-5.1.4.pdf	15809659	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/documentation/files	09-AUG-25 10.39.59.550000000 AM
+		/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/documentation/files	04-DEC-20 09.04.41.533000000 AM
+pom_common_fault	1781253	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/fault	04-DEC-20 09.04.43.436000000 AM
+		/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/fault	04-DEC-20 09.04.43.427000000 AM
+pom_common_in	1781255	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/in	04-DEC-20 09.04.44.304000000 AM
+		/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/in	04-DEC-20 09.04.42.827000000 AM
+pom_common_out	1781257	/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/out	04-DEC-20 09.04.44.548000000 AM
+		/_system/governance/apimgt/applicationdata/provider/api-bot-AT-aexp.com/PaymentOrderManagement/5.1.4/out	04-DEC-20 09.04.43.143000000 AM
