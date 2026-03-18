@@ -1,5 +1,4 @@
 WITH target_apis AS (
-  -- Get the two APIs we want
   SELECT API_ID, API_UUID, API_NAME, API_VERSION
   FROM   COCT42_AM.AM_API
   WHERE  API_NAME    = 'PaymentOrderManagement'
@@ -7,6 +6,7 @@ WITH target_apis AS (
 ),
 latest_rev AS (
   -- Get latest api blob content ID per UUID
+  -- Use INSTR to avoid CLOB concatenation issues
   SELECT
     t.API_NAME,
     t.API_VERSION,
@@ -23,11 +23,10 @@ latest_rev AS (
     ON   p.reg_path_id    = r.reg_path_id
     AND  p.reg_path_value LIKE
            '/_system/governance/apimgt/applicationdata/apis/%'
-           || t.API_UUID || '%'
+    AND  INSTR(p.reg_path_value, t.API_UUID) > 0
   GROUP BY t.API_NAME, t.API_VERSION
 ),
 api_blob AS (
-  -- Decode blob and extract sequence tags
   SELECT
     lr.API_NAME,
     lr.API_VERSION,
@@ -54,7 +53,6 @@ api_blob AS (
     ON   c.reg_content_id = lr.reg_content_id
 ),
 provider_seq AS (
-  -- Provider path in/out sequences
   SELECT
     REGEXP_SUBSTR(p.reg_path_value,
       '/provider/[^/]+/([^/]+)/[^/]+/(in|out)$',
@@ -72,14 +70,10 @@ provider_seq AS (
   JOIN   coct42_reg.reg_path p
     ON   p.reg_path_id = r.reg_path_id
   WHERE  (
-           p.reg_path_value LIKE
-             '%/PaymentOrderManagement/5.1.4/in'
-        OR p.reg_path_value LIKE
-             '%/PaymentOrderManagement/5.1.4/out'
-        OR p.reg_path_value LIKE
-             '%/PaymentOrderManagement/1.1/in'
-        OR p.reg_path_value LIKE
-             '%/PaymentOrderManagement/1.1/out'
+           p.reg_path_value LIKE '%/PaymentOrderManagement/5.1.4/in'
+        OR p.reg_path_value LIKE '%/PaymentOrderManagement/5.1.4/out'
+        OR p.reg_path_value LIKE '%/PaymentOrderManagement/1.1/in'
+        OR p.reg_path_value LIKE '%/PaymentOrderManagement/1.1/out'
          )
     AND  r.reg_name       IS NOT NULL
     AND  r.reg_content_id IS NOT NULL
