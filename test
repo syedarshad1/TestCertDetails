@@ -1,35 +1,4 @@
-WITH raw AS (
-  SELECT
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 1))   AS chunk1,
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 2001)) AS chunk2
-  FROM   coct42_reg.reg_content c
-  WHERE  c.reg_content_id = 18560005
-),
-ep AS (
-  -- Find which chunk has production_endpoints
-  SELECT
-    CASE
-      WHEN INSTR(chunk1, 'production_endpoints') > 0
-        THEN SUBSTR(chunk1,
-               INSTR(chunk1, 'production_endpoints'),
-               500)
-      WHEN INSTR(chunk2, 'production_endpoints') > 0
-        THEN SUBSTR(chunk2,
-               INSTR(chunk2, 'production_endpoints'),
-               500)
-    END                           AS prod_block
-  FROM   raw
-)
-SELECT
-  prod_block,
-  -- show 60 chars around url key
-  SUBSTR(prod_block,
-    INSTR(prod_block, 'url'), 60)  AS url_area,
-  -- show 150 chars around suspend
-  SUBSTR(prod_block,
-    GREATEST(INSTR(prod_block,'suspend')-5,1),
-    150)                          AS suspend_area
-FROM   ep
-WHERE  prod_block IS NOT NULL;
+SELECT owner, table_name
+FROM   all_tables
+WHERE  table_name = 'REG_CONTENT'
+ORDER BY owner;
