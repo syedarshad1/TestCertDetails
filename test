@@ -1,37 +1,65 @@
-WITH latest_rev AS (
+WITH decoded AS (
   SELECT
-    MAX(TO_NUMBER(REGEXP_SUBSTR(
-      p.reg_path_value,
-      '/apis/5c663424-e253-44cb-b13a-965e59b65bf1/([0-9]+)',
-      1, 1, NULL, 1)))          AS rev
-  FROM   coct42_reg.reg_path p
-  WHERE  p.reg_path_value LIKE
-           '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/%'
+    r.reg_name,
+    p.reg_path_value,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1))   AS chunk1,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001)) AS chunk2,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 4001)) AS chunk3
+  FROM   coct42_reg.reg_content c
+  JOIN   coct42_reg.reg_resource r
+    ON   r.reg_content_id = c.reg_content_id
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  c.reg_content_id IN (
+           15809663,  -- api
+           15809683,  -- in
+           15809685,  -- out
+           15809679   -- fault
+         )
 )
 SELECT
-  r.reg_name,
-  r.reg_content_id,
-  p.reg_path_value,
-  r.reg_last_updated_time
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-CROSS JOIN latest_rev lr
-WHERE  (
-         -- api sits at /UUID/rev exactly
-         p.reg_path_value =
-           '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/'
-           || lr.rev
-      OR
-         -- in, out, fault sit at /UUID/rev/type
-         p.reg_path_value IN (
-           '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/'
-             || lr.rev || '/in',
-           '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/'
-             || lr.rev || '/out',
-           '/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/'
-             || lr.rev || '/fault'
-         )
-       )
-  AND  r.reg_content_id IS NOT NULL
-ORDER BY p.reg_path_value;
+  reg_name,
+  REGEXP_SUBSTR(reg_path_value, '/(api|in|out|fault)$',
+    1, 1, 'i', 1)               AS resource_type,
+  CASE
+    WHEN INSTR(UPPER(chunk1),'SUSPEND')>0
+      OR   INSTR(UPPER(chunk2),'SUSPEND')>0
+      OR   INSTR(UPPER(chunk3),'SUSPEND')>0
+      THEN 'Yes'
+    ELSE 'No'
+  END                             AS suspend_found,
+  CASE
+    WHEN INSTR(UPPER(chunk1),'SUSPEND')>0
+      THEN SUBSTR(chunk1,
+             GREATEST(INSTR(UPPER(chunk1),'SUSPEND')-20,1),300)
+    WHEN INSTR(UPPER(chunk2),'SUSPEND')>0
+      THEN SUBSTR(chunk2,
+             GREATEST(INSTR(UPPER(chunk2),'SUSPEND')-20,1),300)
+    WHEN INSTR(UPPER(chunk3),'SUSPEND')>0
+      THEN SUBSTR(chunk3,
+             GREATEST(INSTR(UPPER(chunk3),'SUSPEND')-20,1),300)
+    ELSE 'No suspend found'
+  END                             AS suspend_context,
+  CASE
+    WHEN INSTR(UPPER(chunk1),'CUSTOMSEQUENCES')>0
+      THEN SUBSTR(chunk1,
+             INSTR(UPPER(chunk1),'CUSTOMSEQUENCES'),200)
+    WHEN INSTR(UPPER(chunk2),'CUSTOMSEQUENCES')>0
+      THEN SUBSTR(chunk2,
+             INSTR(UPPER(chunk2),'CUSTOMSEQUENCES'),200)
+    WHEN INSTR(UPPER(chunk3),'CUSTOMSEQUENCES')>0
+      THEN SUBSTR(chunk3,
+             INSTR(UPPER(chunk3),'CUSTOMSEQUENCES'),200)
+    ELSE 'No global seq reference'
+  END                             AS global_seq_ref
+FROM   decoded
+ORDER BY
+  CASE REGEXP_SUBSTR(reg_path_value,'/(api|in|out|fault)$',1,1,'i',1)
+    WHEN 'api'   THEN 1
+    WHEN 'in'    THEN 2
+    WHEN 'out'   THEN 3
+    WHEN 'fault' THEN 4
+  END;
