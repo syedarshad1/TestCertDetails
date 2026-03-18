@@ -11,3 +11,71 @@ WHERE  r.reg_name IN (
          'pom_api_response_out'
        )
 ORDER BY r.reg_name, r.reg_last_updated_time DESC;
+
+
+WITH decoded AS (
+  SELECT
+    r.reg_name,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1))    ||
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001)) ||
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 4001)) ||
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 6001)) AS seq_txt
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_content c
+    ON   c.reg_content_id = r.reg_content_id
+  WHERE  r.reg_name IN (
+           'pom_token_gen_seq_in_1.0.10',
+           'pom_api_response_out'
+         )
+)
+SELECT
+  reg_name,
+  -- Backend URL if hardcoded
+  CASE
+    WHEN INSTR(seq_txt, 'uri-template') > 0
+      THEN SUBSTR(seq_txt,
+             INSTR(seq_txt, 'uri-template="') + 14,
+             INSTR(seq_txt, '"',
+               INSTR(seq_txt, 'uri-template="') + 14) -
+             INSTR(seq_txt, 'uri-template="') - 14)
+    ELSE 'Dynamic or not set'
+  END                             AS backend_url,
+  -- Timeout
+  CASE
+    WHEN INSTR(seq_txt, '<duration>') > 0
+      THEN SUBSTR(seq_txt,
+             INSTR(seq_txt, '<duration>') + 10,
+             INSTR(seq_txt, '</duration>') -
+             INSTR(seq_txt, '<duration>') - 10)
+    ELSE 'Not set'
+  END                             AS timeout_ms,
+  -- Suspend logic
+  CASE
+    WHEN INSTR(UPPER(seq_txt), 'SUSPEND') > 0
+      THEN SUBSTR(seq_txt,
+             GREATEST(INSTR(UPPER(seq_txt), 'SUSPEND') - 30, 1),
+             400)
+    ELSE 'No suspend logic'
+  END                             AS suspend_context,
+  -- Internal sequence calls
+  CASE
+    WHEN INSTR(seq_txt, 'sequence key=') > 0
+      THEN SUBSTR(seq_txt,
+             INSTR(seq_txt, 'sequence key="') + 14,
+             INSTR(seq_txt, '"',
+               INSTR(seq_txt, 'sequence key="') + 14) -
+             INSTR(seq_txt, 'sequence key="') - 14)
+    WHEN INSTR(seq_txt, 'send receive=') > 0
+      THEN SUBSTR(seq_txt,
+             INSTR(seq_txt, 'send receive="') + 14,
+             INSTR(seq_txt, '"',
+               INSTR(seq_txt, 'send receive="') + 14) -
+             INSTR(seq_txt, 'send receive="') - 14)
+    ELSE 'No internal sequence calls'
+  END                             AS calls_sequence
+FROM   decoded
+ORDER BY reg_name;
