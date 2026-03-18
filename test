@@ -1,44 +1,12 @@
-WITH raw_chunks AS (
-  SELECT
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 1))   AS chunk1
-  FROM   coct42_reg.reg_resource r
-  JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id   = r.reg_path_id
-    AND  p.reg_path_value LIKE
-           '/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/%'
-  JOIN   coct42_reg.reg_content c
-    ON   c.reg_content_id = r.reg_content_id
-  WHERE  r.reg_name = 'api'
-    AND  r.reg_content_id = (
-           SELECT MAX(r2.reg_content_id)
-           FROM   coct42_reg.reg_resource r2
-           JOIN   coct42_reg.reg_path p2
-             ON   p2.reg_path_id   = r2.reg_path_id
-             AND  p2.reg_path_value LIKE
-                    '/_system/governance/apimgt/applicationdata/apis/5a1bffee-bafc-4f72-acec-d2275ecad872/%'
-           WHERE  r2.reg_name = 'api'
-         )
-),
-ep_block AS (
-  SELECT
-    chunk1,
-    SUBSTR(chunk1,
-      INSTR(chunk1, 'production_endpoints'),
-      INSTR(chunk1, '}}',
-        INSTR(chunk1, 'production_endpoints')) -
-      INSTR(chunk1, 'production_endpoints') + 2
-    )                             AS prod_block
-  FROM   raw_chunks
-  WHERE  INSTR(chunk1, 'production_endpoints') > 0
-)
+-- See all paths and resources stored under this UUID
 SELECT
-  prod_block,
-  -- show raw url area to verify quote style
-  SUBSTR(prod_block,
-    INSTR(prod_block, 'url'), 60)  AS url_raw,
-  -- show raw suspend area
-  SUBSTR(prod_block,
-    GREATEST(INSTR(prod_block, 'suspend')-5, 1),
-    150)                          AS suspend_raw
-FROM   ep_block;
+  r.reg_name,
+  r.reg_content_id,
+  p.reg_path_value,
+  r.reg_last_updated_time
+FROM   coct42_reg.reg_resource r
+JOIN   coct42_reg.reg_path p
+  ON   p.reg_path_id = r.reg_path_id
+WHERE  p.reg_path_value LIKE
+         '%5a1bffee-bafc-4f72-acec-d2275ecad872%'
+ORDER BY p.reg_path_value, r.reg_name;
