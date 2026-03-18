@@ -1,13 +1,5 @@
--- Decode the latest api blob for P1D-CardManagement v9
--- content ID 18560005 is the latest revision /3
 SELECT
-  SUBSTR(
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 1)),
-    INSTR(
-      utl_raw.cast_to_varchar2(
-        dbms_lob.substr(c.reg_content_data, 2000, 1)),
-      'endpointConfig'),
-    600)                          AS endpoint_config_raw
+  c.reg_content_id,
+  DBMS_LOB.GETLENGTH(c.reg_content_data) AS blob_size_bytes
 FROM   coct42_reg.reg_content c
 WHERE  c.reg_content_id = 18560005;
