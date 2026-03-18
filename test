@@ -1,19 +1,3 @@
-API_NAME	API_VERSION	CONTEXT	STATUS	TENANT	UPDATED_TIME	SUSPENSION_LOGIC	ENDPOINT_CONFIG
-
-SUSPENSION_LOGIC
-Default suspension
-Suspension disabled (sequence file mention file name)
-Suspension disabled (endpointConfig)
-No registry entry
-Active suspension
-
-ENDPOINT_CONFIG
-if you found in api, then extract suspend portion content
-same for others
-if suspend no where find, then should be default
-
-I was using below query below, now combine with above query to serach with API_UUID then API and version
-
 WITH reg_apis AS (
   SELECT
     REGEXP_SUBSTR(p.reg_path_value,
@@ -33,15 +17,18 @@ WITH reg_apis AS (
 latest_rev AS (
   SELECT
     api_uuid,
+    MAX(rev)                      AS latest_rev,
     MAX(reg_content_id) KEEP
       (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
   FROM   reg_apis
   WHERE  api_uuid IS NOT NULL
   GROUP BY api_uuid
 ),
-decoded AS (
+api_blob AS (
+  -- Decode api blob for endpointConfig
   SELECT
     lr.api_uuid,
+    lr.latest_rev,
     TO_CLOB(utl_raw.cast_to_varchar2(
       dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
     TO_CLOB(utl_raw.cast_to_varchar2(
@@ -58,47 +45,129 @@ decoded AS (
   LEFT JOIN coct42_reg.reg_content c
     ON   c.reg_content_id = lr.reg_content_id
 ),
-cleaned AS (
+endpoint_config AS (
+  -- Extract endpointConfig block and clean for CSV
   SELECT
-    d.api_uuid,
-    d.clob_txt,
-    REPLACE(
-      REPLACE(
-        REPLACE(
-          REPLACE(
-            REGEXP_SUBSTR(
-              d.clob_txt,
-              '<endpointConfig>.*?</endpointConfig>',
-              1, 1, 'n'
-            ),
-            CHR(10), ''
-          ),
-          CHR(13), ''
-        ),
-        CHR(9), ''
-      ),
-      '"', ''''
-    ) AS endpoint_config
-  FROM   decoded d
+    api_uuid,
+    clob_txt,
+    REPLACE(REPLACE(REPLACE(REPLACE(
+      REGEXP_SUBSTR(clob_txt,
+        '<endpointConfig>.*?</endpointConfig>',
+        1, 1, 'n'),
+    CHR(10),''),CHR(13),''),CHR(9),''),'"','''')
+    AS endpoint_config_raw
+  FROM   api_blob
+),
+seq_resources AS (
+  -- Get in/out/fault content for latest revision per API
+  SELECT
+    lr.api_uuid,
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/(in|out|fault)$',
+      1, 1, 'i', 1)             AS res_type,
+    r.reg_name                   AS seq_name,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1))   AS chunk1,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 2001)) AS chunk2,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 4001)) AS chunk3
+  FROM   latest_rev lr
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_value IN (
+           '/_system/governance/apimgt/applicationdata/apis/'
+             || lr.api_uuid || '/' || lr.latest_rev || '/in',
+           '/_system/governance/apimgt/applicationdata/apis/'
+             || lr.api_uuid || '/' || lr.latest_rev || '/out',
+           '/_system/governance/apimgt/applicationdata/apis/'
+             || lr.api_uuid || '/' || lr.latest_rev || '/fault'
+         )
+  JOIN   coct42_reg.reg_resource r
+    ON   r.reg_path_id    = p.reg_path_id
+    AND  r.reg_content_id IS NOT NULL
+  JOIN   coct42_reg.reg_content c
+    ON   c.reg_content_id = r.reg_content_id
+),
+seq_suspend AS (
+  -- Find first sequence with suspend keyword per API
+  SELECT
+    api_uuid,
+    MAX(seq_name) KEEP
+      (DENSE_RANK FIRST ORDER BY
+        CASE res_type
+          WHEN 'in'    THEN 1
+          WHEN 'out'   THEN 2
+          WHEN 'fault' THEN 3
+        END
+      )                           AS seq_name,
+    MAX(
+      CASE
+        WHEN INSTR(UPPER(chunk1),'SUSPEND')>0
+          THEN SUBSTR(chunk1,
+                 GREATEST(INSTR(UPPER(chunk1),'SUSPEND')-20,1),300)
+        WHEN INSTR(UPPER(chunk2),'SUSPEND')>0
+          THEN SUBSTR(chunk2,
+                 GREATEST(INSTR(UPPER(chunk2),'SUSPEND')-20,1),300)
+        WHEN INSTR(UPPER(chunk3),'SUSPEND')>0
+          THEN SUBSTR(chunk3,
+                 GREATEST(INSTR(UPPER(chunk3),'SUSPEND')-20,1),300)
+      END
+    ) KEEP (DENSE_RANK FIRST ORDER BY
+        CASE res_type
+          WHEN 'in'    THEN 1
+          WHEN 'out'   THEN 2
+          WHEN 'fault' THEN 3
+        END
+      )                           AS suspend_context,
+    MAX(
+      CASE
+        WHEN INSTR(UPPER(chunk1),'SUSPEND')>0
+          OR   INSTR(UPPER(chunk2),'SUSPEND')>0
+          OR   INSTR(UPPER(chunk3),'SUSPEND')>0
+          THEN 1 ELSE 0
+      END
+    )                             AS has_suspend
+  FROM   seq_resources
+  GROUP BY api_uuid
 )
 SELECT
   a.API_NAME,
   a.API_VERSION,
   a.CONTEXT,
   a.STATUS,
-  a.ORGANIZATION                                  AS TENANT,
+  a.ORGANIZATION                  AS TENANT,
   a.UPDATED_TIME,
   CASE
-    WHEN c.clob_txt IS NULL
+    -- No registry entry at all
+    WHEN ec.clob_txt IS NULL
       THEN 'No registry entry'
-    WHEN INSTR(c.clob_txt, '"suspendMaxDuration":"0"') > 0
-      THEN 'Suspension effectively disabled'
-    WHEN INSTR(c.clob_txt, 'suspendErrorCode') > 0
-      THEN 'Active suspension'
+    -- Suspend found in sequence file — takes priority
+    WHEN ss.has_suspend = 1
+      AND INSTR(UPPER(ss.suspend_context), 'MAXIMUMDURATION>0') > 0
+      THEN 'Suspension disabled (sequence: ' || ss.seq_name || ')'
+    WHEN ss.has_suspend = 1
+      AND INSTR(UPPER(ss.suspend_context), 'ERRORCODES>-1') > 0
+      THEN 'Suspension disabled (sequence: ' || ss.seq_name || ')'
+    WHEN ss.has_suspend = 1
+      THEN 'Active suspension (sequence: ' || ss.seq_name || ')'
+    -- No sequence suspend — check endpointConfig
+    WHEN INSTR(ec.clob_txt, '"suspendMaxDuration":"0"') > 0
+      THEN 'Suspension disabled (endpointConfig)'
+    WHEN INSTR(ec.clob_txt, 'suspendErrorCode') > 0
+      THEN 'Active suspension (endpointConfig)'
+    -- Nothing found anywhere
     ELSE 'Default suspension'
-  END                                             AS SUSPENSION_LOGIC,
-  c.endpoint_config
+  END                             AS SUSPENSION_LOGIC,
+  -- Endpoint config extracted from api blob
+  ec.endpoint_config_raw          AS ENDPOINT_CONFIG,
+  -- Suspend block from sequence if found
+  REPLACE(REPLACE(REPLACE(
+    ss.suspend_context,
+  CHR(10),' '),CHR(13),''),CHR(9),' ')
+                                  AS SEQUENCE_SUSPEND_BLOCK
 FROM   COCT42_AM.AM_API a
-LEFT JOIN cleaned c
-  ON   a.API_UUID = c.api_uuid
+LEFT JOIN endpoint_config ec
+  ON   ec.api_uuid = a.API_UUID
+LEFT JOIN seq_suspend ss
+  ON   ss.api_uuid = a.API_UUID
 ORDER BY TENANT, SUSPENSION_LOGIC, a.API_NAME, a.API_VERSION;
