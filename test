@@ -1,4 +1,18 @@
-15809685	4f9f6558-5980-498e-a98c-ab0dabfd9de5	pom_common_out	application/json	/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/out	09-AUG-25 10.40.00.894000000 AM
-15809683	997ce50c-fab2-49cf-9010-6940b6d423b3	pom_common_in	application/json	/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/in	09-AUG-25 10.40.00.780000000 AM
-15809679	b27e52a9-daab-4c19-a73e-01f44b90544b	pom_common_fault		/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2/fault	09-AUG-25 10.40.00.677000000 AM
-15809663	2d7277d4-ffae-4b97-9655-651317cbb189	api	application/vnd.wso2-api+xml	/_system/governance/apimgt/applicationdata/apis/5c663424-e253-44cb-b13a-965e59b65bf1/2	09-AUG-25 10.40.00.090000000 AM
+pom_token_gen_seq_in	No	No suspend found
+pom_token_gen_seq_in_1.0.10	No	No suspend found
+pom_token_gen_seq_in2	No	No suspend found
+pom_common_in	No	No suspend found
+pom_api_request_in_1.0.10	Yes	"t>
+                <suspendOnFailure>
+                    <errorCodes>-1</errorCodes>
+                    <initialDuration>0</initialDuration>
+                    <progressionFactor>1.0</progressionFactor>
+                    <maximumDuration>0</maximumDuration>
+                </suspendOnFailure>
+ "
+opf_token_gen_seq_in	No	No suspend found
+pom_api_response_out	No	No suspend found
+api_response_out	No	No suspend found
+pom_common_out	No	No suspend found
+token_gen_seq_fault	No	No suspend found
+opf_token_gen_seq_in	No	No suspend found
