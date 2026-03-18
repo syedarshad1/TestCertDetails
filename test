@@ -1,28 +1,97 @@
-"<sequence xmlns="http://ws.apache.org/ns/synapse" name="pom_common_in" trace="disable">
-    <property expression="get-property('axis2','REST_URL_POSTFIX')" name="Resource_Path" scope="default" type="STRING"/>
-	<property action="remove" name="REST_URL_POSTFIX" scope="axis2"/>
-	<property action="remove" name="X-JWT-Assertion" scope="transport"/>
-    <property action="remove" name="X-Authorization" scope="transport"/>
-    <property value="Basic QU1FWENIX1VTRVI6cGFzc3dvcmQ=" name="Authorization" scope="transport" type="STRING"/>
-    <property expression="fn:concat('http://pom-amx-pom-uat.pdcocpapp.fnfis.com/pom', get-property('Resource_Path'))" name="uri.var.pomEndpoint" scope="default" type="STRING"/>
-
-	
-
-	<log level="custom">
-		<property name="before send" value="BEFORESEND-POM"/>    
-		<property expression="get-property('uri.var.pomEndpoint')" name="POM target endpoint"/>
-	</log>
-
-	<send>
-        <endpoint>
-            <http uri-template="{uri.var.pomEndpoint}">
-				 <timeout>
-                    <duration>60000</duration>
-                </timeout>
-			</http>
-        </endpoint>
-    </send>
-</sequence>"				No suspend	"<sequence xmlns="http://ws.apache.org/ns/synapse" name="pom_common_in" trace="disable">
-    <property expression="get-property('axis2','REST_URL_POSTFIX')" name="Resource_Path" scope="default" type="STRING"/>
-	<property action="remove" name="REST_URL_POSTFIX" scope="axis2"/>
-	<property action="remov"
+WITH reg_apis AS (
+  -- Latest API blob per UUID
+  SELECT
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/([0-9a-fA-F-]{36})/',
+      1, 1, NULL, 1)             AS api_uuid,
+    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+      1, 1, NULL, 1))            AS rev,
+    r.reg_content_id
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  r.reg_name = 'api'
+    AND  p.reg_path_value LIKE
+         '/_system/governance/apimgt/applicationdata/apis/%'
+),
+latest_rev AS (
+  SELECT
+    api_uuid,
+    MAX(reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
+  FROM   reg_apis
+  WHERE  api_uuid IS NOT NULL
+  GROUP BY api_uuid
+),
+api_blob AS (
+  -- Decode API blob and extract inSequence tag
+  SELECT
+    lr.api_uuid,
+    REGEXP_SUBSTR(
+      TO_CLOB(utl_raw.cast_to_varchar2(
+        dbms_lob.substr(c.reg_content_data, 2000, 1)))  ||
+      TO_CLOB(utl_raw.cast_to_varchar2(
+        dbms_lob.substr(c.reg_content_data, 2000, 2001)))||
+      TO_CLOB(utl_raw.cast_to_varchar2(
+        dbms_lob.substr(c.reg_content_data, 2000, 4001))),
+      '<inSequence>([^<]+)</inSequence>',
+      1, 1, 'n', 1)               AS in_seq_from_blob
+  FROM   latest_rev lr
+  LEFT JOIN coct42_reg.reg_content c
+    ON   c.reg_content_id = lr.reg_content_id
+),
+provider_seq AS (
+  -- Check if provider /in path exists for this API
+  SELECT
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/provider/[^/]+/([^/]+)/[^/]+/in$',
+      1, 1, 'i', 1)             AS api_name,
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/provider/[^/]+/[^/]+/([^/]+)/in$',
+      1, 1, 'i', 1)             AS api_version,
+    MAX(r.reg_name) KEEP
+      (DENSE_RANK LAST ORDER BY r.reg_last_updated_time)
+      AS provider_seq_name
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  p.reg_path_value LIKE
+           '/_system/governance/apimgt/applicationdata/provider/%/in'
+    AND  r.reg_name       IS NOT NULL
+    AND  r.reg_content_id IS NOT NULL
+  GROUP BY
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/provider/[^/]+/([^/]+)/[^/]+/in$',
+      1, 1, 'i', 1),
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/provider/[^/]+/[^/]+/([^/]+)/in$',
+      1, 1, 'i', 1)
+)
+SELECT
+  a.API_NAME,
+  a.API_VERSION,
+  a.CONTEXT,
+  a.STATUS,
+  a.ORGANIZATION                  AS TENANT,
+  a.UPDATED_TIME,
+  -- Which sequence name is used
+  COALESCE(ps.provider_seq_name,
+           ab.in_seq_from_blob,
+           'None')               AS in_sequence_name,
+  -- Where is the sequence coming from
+  CASE
+    WHEN ps.provider_seq_name IS NOT NULL
+      THEN 'Provider sequence'
+    WHEN ab.in_seq_from_blob IS NOT NULL
+      THEN 'Global sequence (via API blob)'
+    ELSE
+      'No sequence defined'
+  END                             AS sequence_type
+FROM   COCT42_AM.AM_API a
+LEFT JOIN api_blob ab
+  ON   ab.api_uuid = a.API_UUID
+LEFT JOIN provider_seq ps
+  ON   ps.api_name    = a.API_NAME
+  AND  ps.api_version = a.API_VERSION
+ORDER BY sequence_type, a.ORGANIZATION, a.API_NAME, a.API_VERSION;
