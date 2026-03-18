@@ -1,29 +1,59 @@
-WITH decoded AS (
+WITH params AS (
+  -- Change UUID here only
+  SELECT '5c663424-e253-44cb-b13a-965e59b65bf1' AS api_uuid
+  FROM   dual
+),
+base_path AS (
+  -- Build the base path prefix for this UUID
   SELECT
+    '/_system/governance/apimgt/applicationdata/apis/'
+    || p.api_uuid                  AS base
+  FROM   params p
+),
+latest_rev AS (
+  -- Find highest revision number under this UUID
+  SELECT
+    MAX(TO_NUMBER(REGEXP_SUBSTR(
+      rp.reg_path_value,
+      '/([0-9]+)(/|$)',
+      1, 1, NULL, 1)))          AS rev
+  FROM   coct42_reg.reg_path rp
+  CROSS JOIN base_path bp
+  WHERE  rp.reg_path_value LIKE bp.base || '/%'
+),
+target_paths AS (
+  -- Build exact paths for api, in, out, fault
+  SELECT bp.base || '/' || lr.rev        AS target_path, 'api'   AS res_type FROM base_path bp CROSS JOIN latest_rev lr
+  UNION ALL
+  SELECT bp.base || '/' || lr.rev || '/in',    'in'    FROM base_path bp CROSS JOIN latest_rev lr
+  UNION ALL
+  SELECT bp.base || '/' || lr.rev || '/out',   'out'   FROM base_path bp CROSS JOIN latest_rev lr
+  UNION ALL
+  SELECT bp.base || '/' || lr.rev || '/fault', 'fault' FROM base_path bp CROSS JOIN latest_rev lr
+),
+decoded AS (
+  -- Join to get content and decode chunks
+  SELECT
+    tp.res_type,
     r.reg_name,
-    p.reg_path_value,
     utl_raw.cast_to_varchar2(
       dbms_lob.substr(c.reg_content_data, 2000, 1))   AS chunk1,
     utl_raw.cast_to_varchar2(
       dbms_lob.substr(c.reg_content_data, 2000, 2001)) AS chunk2,
     utl_raw.cast_to_varchar2(
       dbms_lob.substr(c.reg_content_data, 2000, 4001)) AS chunk3
-  FROM   coct42_reg.reg_content c
+  FROM   target_paths tp
+  JOIN   coct42_reg.reg_path rp
+    ON   rp.reg_path_value = tp.target_path
   JOIN   coct42_reg.reg_resource r
-    ON   r.reg_content_id = c.reg_content_id
-  JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id = r.reg_path_id
-  WHERE  c.reg_content_id IN (
-           15809663,  -- api
-           15809683,  -- in
-           15809685,  -- out
-           15809679   -- fault
-         )
+    ON   r.reg_path_id     = rp.reg_path_id
+    AND  r.reg_content_id  IS NOT NULL
+  JOIN   coct42_reg.reg_content c
+    ON   c.reg_content_id  = r.reg_content_id
 )
 SELECT
+  res_type,
   reg_name,
-  REGEXP_SUBSTR(reg_path_value, '/(api|in|out|fault)$',
-    1, 1, 'i', 1)               AS resource_type,
   CASE
     WHEN INSTR(UPPER(chunk1),'SUSPEND')>0
       OR   INSTR(UPPER(chunk2),'SUSPEND')>0
@@ -57,7 +87,7 @@ SELECT
   END                             AS global_seq_ref
 FROM   decoded
 ORDER BY
-  CASE REGEXP_SUBSTR(reg_path_value,'/(api|in|out|fault)$',1,1,'i',1)
+  CASE res_type
     WHEN 'api'   THEN 1
     WHEN 'in'    THEN 2
     WHEN 'out'   THEN 3
