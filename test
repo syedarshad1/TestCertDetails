@@ -1,2 +1,13 @@
-PaymentOrderManagement	1.1	pom_token_gen_seq_in_1.0.10	Provider path	pom_api_response_out	Provider path
-PaymentOrderManagement	5.1.4	pom_common_in	Provider path	pom_common_out	Provider path
+SELECT
+  r.reg_name,
+  r.reg_content_id,
+  p.reg_path_value,
+  r.reg_last_updated_time
+FROM   coct42_reg.reg_resource r
+JOIN   coct42_reg.reg_path p
+  ON   p.reg_path_id = r.reg_path_id
+WHERE  r.reg_name IN (
+         'pom_token_gen_seq_in_1.0.10',
+         'pom_api_response_out'
+       )
+ORDER BY r.reg_name, r.reg_last_updated_time DESC;
