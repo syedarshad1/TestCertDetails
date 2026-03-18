@@ -1,32 +1,8 @@
-WITH reg_apis AS (
-  SELECT
-    REGEXP_SUBSTR(p.reg_path_value,
-      '/apis/([0-9a-fA-F-]{36})/',
-      1, 1, NULL, 1)             AS api_uuid,
-    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
-      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
-      1, 1, NULL, 1))            AS rev,
-    r.reg_content_id
-  FROM   coct42_reg.reg_resource r
-  JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id = r.reg_path_id
-  WHERE  r.reg_name = 'api'
-    AND  p.reg_path_value LIKE
-         '/_system/governance/apimgt/applicationdata/apis/%'
-),
-latest_rev AS (
-  SELECT
-    api_uuid,
-    MAX(reg_content_id) KEEP
-      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
-  FROM   reg_apis
-  WHERE  api_uuid IS NOT NULL
-  GROUP BY api_uuid
-),
-api_blob AS (
+WITH api_blob AS (
   -- Extract inSequence and outSequence from API blob
   SELECT
-    lr.api_uuid,
+    a.API_NAME,
+    a.API_VERSION,
     REGEXP_SUBSTR(
       TO_CLOB(utl_raw.cast_to_varchar2(
         dbms_lob.substr(c.reg_content_data, 2000, 1)))  ||
@@ -45,12 +21,20 @@ api_blob AS (
         dbms_lob.substr(c.reg_content_data, 2000, 4001))),
       '<outSequence>([^<]+)</outSequence>',
       1, 1, 'n', 1)               AS out_seq_from_blob
-  FROM   latest_rev lr
-  LEFT JOIN coct42_reg.reg_content c
-    ON   c.reg_content_id = lr.reg_content_id
+  FROM   COCT42_AM.AM_API a
+  JOIN   coct42_reg.reg_resource r
+    ON   r.reg_name = 'api'
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+    AND  p.reg_path_value LIKE
+           '%' || a.API_UUID || '%'
+  JOIN   coct42_reg.reg_content c
+    ON   c.reg_content_id = r.reg_content_id
+  WHERE  a.API_NAME    = 'PaymentOrderManagement'
+    AND  a.API_VERSION IN ('5.1.4', '1.1')
 ),
 provider_seq AS (
-  -- Provider path in/out sequences
+  -- Provider path in/out sequences for these two APIs
   SELECT
     REGEXP_SUBSTR(p.reg_path_value,
       '/provider/[^/]+/([^/]+)/[^/]+/(in|out)$',
@@ -69,9 +53,13 @@ provider_seq AS (
     ON   p.reg_path_id = r.reg_path_id
   WHERE  (
            p.reg_path_value LIKE
-             '/_system/governance/apimgt/applicationdata/provider/%/in'
+             '%/PaymentOrderManagement/5.1.4/in'
         OR p.reg_path_value LIKE
-             '/_system/governance/apimgt/applicationdata/provider/%/out'
+             '%/PaymentOrderManagement/5.1.4/out'
+        OR p.reg_path_value LIKE
+             '%/PaymentOrderManagement/1.1/in'
+        OR p.reg_path_value LIKE
+             '%/PaymentOrderManagement/1.1/out'
          )
     AND  r.reg_name       IS NOT NULL
     AND  r.reg_content_id IS NOT NULL
@@ -87,39 +75,31 @@ provider_seq AS (
       1, 1, 'i', 1)
 )
 SELECT
-  a.API_NAME,
-  a.API_VERSION,
-  a.CONTEXT,
-  a.STATUS,
-  a.ORGANIZATION                  AS TENANT,
-  a.UPDATED_TIME,
-  -- In sequence
-  COALESCE(
-    pin.seq_name,
-    ab.in_seq_from_blob)           AS in_sequence_name,
+  ab.API_NAME,
+  ab.API_VERSION,
+  COALESCE(pin.seq_name,
+           ab.in_seq_from_blob,
+           'None')               AS in_sequence_name,
   CASE
     WHEN pin.seq_name        IS NOT NULL THEN 'Provider path'
     WHEN ab.in_seq_from_blob IS NOT NULL THEN 'Global (API blob tag)'
     ELSE 'None'
   END                             AS in_sequence_source,
-  -- Out sequence
-  COALESCE(
-    pout.seq_name,
-    ab.out_seq_from_blob)          AS out_sequence_name,
+  COALESCE(pout.seq_name,
+           ab.out_seq_from_blob,
+           'None')               AS out_sequence_name,
   CASE
     WHEN pout.seq_name        IS NOT NULL THEN 'Provider path'
     WHEN ab.out_seq_from_blob IS NOT NULL THEN 'Global (API blob tag)'
     ELSE 'None'
   END                             AS out_sequence_source
-FROM   COCT42_AM.AM_API a
-LEFT JOIN api_blob ab
-  ON   ab.api_uuid        = a.API_UUID
+FROM   api_blob ab
 LEFT JOIN provider_seq pin
-  ON   pin.api_name       = a.API_NAME
-  AND  pin.api_version    = a.API_VERSION
-  AND  pin.seq_type       = 'in'
+  ON   pin.api_name    = ab.API_NAME
+  AND  pin.api_version = ab.API_VERSION
+  AND  pin.seq_type    = 'in'
 LEFT JOIN provider_seq pout
-  ON   pout.api_name      = a.API_NAME
-  AND  pout.api_version   = a.API_VERSION
-  AND  pout.seq_type      = 'out'
-ORDER BY in_sequence_source, a.ORGANIZATION, a.API_NAME, a.API_VERSION;
+  ON   pout.api_name    = ab.API_NAME
+  AND  pout.api_version = ab.API_VERSION
+  AND  pout.seq_type    = 'out'
+ORDER BY ab.API_VERSION;
