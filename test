@@ -1,8 +1,36 @@
-WITH api_blob AS (
-  -- Extract inSequence and outSequence from API blob
+WITH target_apis AS (
+  -- Get the two APIs we want
+  SELECT API_ID, API_UUID, API_NAME, API_VERSION
+  FROM   COCT42_AM.AM_API
+  WHERE  API_NAME    = 'PaymentOrderManagement'
+    AND  API_VERSION IN ('5.1.4', '1.1')
+),
+latest_rev AS (
+  -- Get latest api blob content ID per UUID
   SELECT
-    a.API_NAME,
-    a.API_VERSION,
+    t.API_NAME,
+    t.API_VERSION,
+    MAX(r.reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY
+        TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+          '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+          1, 1, NULL, 1))
+      ) AS reg_content_id
+  FROM   target_apis t
+  JOIN   coct42_reg.reg_resource r
+    ON   r.reg_name = 'api'
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id    = r.reg_path_id
+    AND  p.reg_path_value LIKE
+           '/_system/governance/apimgt/applicationdata/apis/%'
+           || t.API_UUID || '%'
+  GROUP BY t.API_NAME, t.API_VERSION
+),
+api_blob AS (
+  -- Decode blob and extract sequence tags
+  SELECT
+    lr.API_NAME,
+    lr.API_VERSION,
     REGEXP_SUBSTR(
       TO_CLOB(utl_raw.cast_to_varchar2(
         dbms_lob.substr(c.reg_content_data, 2000, 1)))  ||
@@ -21,20 +49,12 @@ WITH api_blob AS (
         dbms_lob.substr(c.reg_content_data, 2000, 4001))),
       '<outSequence>([^<]+)</outSequence>',
       1, 1, 'n', 1)               AS out_seq_from_blob
-  FROM   COCT42_AM.AM_API a
-  JOIN   coct42_reg.reg_resource r
-    ON   r.reg_name = 'api'
-  JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id = r.reg_path_id
-    AND  p.reg_path_value LIKE
-           '%' || a.API_UUID || '%'
+  FROM   latest_rev lr
   JOIN   coct42_reg.reg_content c
-    ON   c.reg_content_id = r.reg_content_id
-  WHERE  a.API_NAME    = 'PaymentOrderManagement'
-    AND  a.API_VERSION IN ('5.1.4', '1.1')
+    ON   c.reg_content_id = lr.reg_content_id
 ),
 provider_seq AS (
-  -- Provider path in/out sequences for these two APIs
+  -- Provider path in/out sequences
   SELECT
     REGEXP_SUBSTR(p.reg_path_value,
       '/provider/[^/]+/([^/]+)/[^/]+/(in|out)$',
