@@ -1,1 +1,31 @@
+Perfect!
+
+Now I am taking different api_uuid, where in and out sequence present, then we seaarch 'suspend' key word in both sequence .xml file
+
 ALS	/t/aaa.com/als/v1	aaa.com	c6f3df68-f5da-4d89-979e-f163db878f0a	api	Default Suspension	15719621	/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/1	{"production_endpoints":{"url":"default"},"sandbox_endpoints":{"url":"default"},"endpoint_type":"default"}	aaa_als_seq_in	aaa_als_seq_out
+
+if in and out sequence present, then we need to search for suspend in those in/out sequence file
+
+SELECT 
+  r.reg_content_id,
+  r.reg_uuid,
+  r.reg_name,
+  r.reg_media_type,
+  p.reg_path_value,
+  r.reg_last_updated_time
+FROM coct42_reg.reg_resource r
+JOIN coct42_reg.reg_path p
+  ON r.reg_path_id = p.reg_path_id
+WHERE --r.reg_name like  '%SNAP-Recipient%'
+      --p.reg_path_value LIKE '%c6f3df68-f5da-4d89-979e-f163db878f0a%'
+  --AND p.reg_path_value LIKE '%6f8d9aa2-077e-4b7a-9106-ba78d013dc5e%'
+    r.reg_name like  '%aaa_als_seq_in%'
+     --r.reg_uuid like  '%822bb236-3b62-4a86-88aa-c4c8521c9d52%'
+  --AND p.reg_path_value  LIKE '%Billpay%'
+  --AND r.reg_tenant_id = 12
+ORDER BY r.reg_last_updated_time DESC;
+
+14071087	822bb236-3b62-4a86-88aa-c4c8521c9d52	aaa_als_seq_in.xml	application/vnd.wso2.sequence	/_system/governance/apimgt/customsequences/in	06-MAY-25 02.46.31.225000000 AM
+14071089	3f1cf785-3e39-4340-b148-6cd44aad927e	aaa_als_seq_out.xml	application/vnd.wso2.sequence	/_system/governance/apimgt/customsequences/out	06-MAY-25 02.46.31.270000000 AM
+
+then take reg_content_id and search for 'suspend' keyword in reg_content_data(which again same blob datatype) then update the suspensionlogic column accordingly, also create a new column in the we can provide where 'suspend' key work found, api or aaa_als_seq_in/aaa_als_seq_out etc
