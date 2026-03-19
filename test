@@ -1,3 +1,4 @@
+Error starting at line : 1 in command -
 WITH reg_apis AS (
   SELECT
     REGEXP_SUBSTR(p.reg_path_value,
@@ -344,4 +345,7 @@ LEFT JOIN api_analysis ec
   ON   ec.api_uuid = a.API_UUID
 LEFT JOIN seq_suspend ss
   ON   ss.api_uuid = a.API_UUID
-ORDER BY a.ORGANIZATION, SUSPENSION_LOGIC, a.API_NAME, a.API_VERSION;
+ORDER BY a.ORGANIZATION, SUSPENSION_LOGIC, a.API_NAME, a.API_VERSION
+Error report -
+ORA-01465: invalid hex number
+
