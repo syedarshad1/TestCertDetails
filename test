@@ -52,7 +52,7 @@ api_analysis AS (
   SELECT
     api_uuid,
     clob_txt,
-    -- endpointConfig as VARCHAR2 using LOB functions — no REGEXP on CLOB
+    -- endpointConfig as VARCHAR2 using LOB functions
     CASE
       WHEN DBMS_LOB.INSTR(clob_txt,
              CHR(60)||'endpointConfig'||CHR(62)) > 0
@@ -200,6 +200,7 @@ seq_analysis AS (
                  INSTR(chunk2,CHR(60)||'/endpointConfig'||CHR(62))-
                  INSTR(chunk2,CHR(60)||'endpointConfig'||CHR(62))+17),
              CHR(10),''),CHR(13),''),CHR(9),''),'"','''')
+      ELSE NULL
     END                           AS seq_endpoint_config,
     -- actionDuration from sequence
     CASE
@@ -239,6 +240,7 @@ seq_analysis AS (
                INSTR(chunk3,'"',
                  INSTR(chunk3,'actionDuration":"')+17)-
                INSTR(chunk3,'actionDuration":"')-17)
+      ELSE NULL
     END                           AS action_duration
   FROM   seq_resources
 ),
@@ -335,11 +337,9 @@ SELECT
     WHEN ec.api_has_suspend=1 THEN 'endpointConfig'
     ELSE NULL
   END                             AS SEQUENCE_TYPE,
-  -- ENDPOINT_CONFIG: seq first then api — both VARCHAR2
   COALESCE(
     ss.seq_endpoint_config,
     ec.api_endpoint_config)        AS ENDPOINT_CONFIG,
-  -- TIMEOUT: seq first then api then global default
   COALESCE(
     ss.seq_action_duration,
     ec.api_action_duration,
