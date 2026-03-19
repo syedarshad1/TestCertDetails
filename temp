@@ -1,1 +1,37 @@
-AlertServices	v1	carbon.super	endpointConfig>{"endpoint_type":"default","sandbox_endpoints":{"config":{"suspendDuration":"0","suspendErrorCode":["-1"],"suspendMaxDuration":"0"},"url":"default"},"production_endpoints":{"config":{"suspendDuration":"0","suspendErrorCode":["-1"],"suspendMaxDuration":"0"},"url":"default"}}</endpointConfig><vendor></vendor><inSequence></inSequence><testKey></testKey><endpointSecured>false</endpointSecured><endpointAuthDigest>false</endpointAuthDigest><tenants></tenants><endpointPpassword></endpoin		e":"default","sandbox_endpoints":{"config":{"suspendDuration":"0","suspendErrorCode":["-1"],"suspendMaxDuration":"0"},"url":"default"},"production_endpoints":{"config":{"suspendDuration":"0","suspendErrorCode":["-1"],"suspendMaxDuration":"0"},"url":"default"}}</endpointConfig><vendor></vendor><inSeq
+SELECT
+  a.API_NAME,
+  a.API_UUID,
+  -- extract 200 bytes from where inSequence tag starts
+  utl_raw.cast_to_varchar2(
+    dbms_lob.substr(c.reg_content_data, 200,
+      DBMS_LOB.INSTR(c.reg_content_data,
+        UTL_RAW.CAST_TO_RAW('<inSequence>'))))       AS in_seq_area,
+  -- extract 500 bytes from where endpointConfig tag starts
+  utl_raw.cast_to_varchar2(
+    dbms_lob.substr(c.reg_content_data, 500,
+      DBMS_LOB.INSTR(c.reg_content_data,
+        UTL_RAW.CAST_TO_RAW('<endpointConfig>'))))   AS endpoint_config_area
+FROM COCT42_AM.AM_API a
+JOIN coct42_reg.reg_resource r
+  ON r.reg_name = 'api'
+JOIN coct42_reg.reg_path p
+  ON p.reg_path_id = r.reg_path_id
+  AND p.reg_path_value LIKE
+      '/_system/governance/apimgt/applicationdata/apis/'
+      || a.API_UUID || '/%'
+JOIN coct42_reg.reg_content c
+  ON c.reg_content_id = r.reg_content_id
+WHERE a.API_UUID IN (
+  'fd1b5417-eeea-4fef-b2df-c36affe0913e',
+  'c6f3df68-f5da-4d89-979e-f163db878f0a'
+)
+AND r.reg_content_id IN (
+  SELECT MAX(r2.reg_content_id)
+  FROM coct42_reg.reg_resource r2
+  JOIN coct42_reg.reg_path p2
+    ON p2.reg_path_id = r2.reg_path_id
+  WHERE r2.reg_name = 'api'
+    AND p2.reg_path_value LIKE
+        '/_system/governance/apimgt/applicationdata/apis/'
+        || a.API_UUID || '/%'
+);
