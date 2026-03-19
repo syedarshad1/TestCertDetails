@@ -1,6 +1,1 @@
--- Check column type
-SELECT column_name, data_type
-FROM all_tab_columns
-WHERE table_name = 'REG_CONTENT'
-  AND column_name = 'REG_CONTENT_DATA'
-  AND owner = 'COCT42_REG';
+REG_CONTENT_DATA	BLOB
