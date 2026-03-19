@@ -1,23 +1,63 @@
-Perfect!
-
-now problem is its not always suspend login in custom sequence, something custom sequence file contains endpoint xml file where suspension logic defined
-
-eg: Now problem is path and name is not always same
-    <property expression="get-property('registry', 'conf:repository/resources/endpoints/als_endpoints.xml')" name="target_endpoint" scope="default" type="OM"/>
-
-then we have search for suspend in those endpoint xml file like
-
-SELECT   r.reg_content_id,  r.reg_uuid,  r.reg_name,  r.reg_media_type,  p.reg_path_value,  r.reg_last_updated_time
-FROM coct42_reg.reg_resource r
-JOIN coct42_reg.reg_path p
-  ON r.reg_path_id = p.reg_path_id
-WHERE --r.reg_name like  '%SNAP-Recipient%'
-      --p.reg_path_value LIKE '%c6f3df68-f5da-4d89-979e-f163db878f0a%'
-  --AND p.reg_path_value LIKE '%6f8d9aa2-077e-4b7a-9106-ba78d013dc5e%'
-    r.reg_name like  '%als_endpoints%'
-     --r.reg_uuid like  '%822bb236-3b62-4a86-88aa-c4c8521c9d52%'
-  --AND p.reg_path_value  LIKE '%Billpay%'
-  --AND r.reg_tenant_id = 12
-ORDER BY r.reg_last_updated_time DESC;
-
-SELECT * FROM coct42_reg.reg_content c WHERE c.reg_content_id = 14071047; -- search for suspend and update the supensionlogic and suspensionsource accordindly
+WITH api_sample AS (
+    SELECT 
+        a.API_NAME,
+        a.API_UUID,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS content_p1,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS content_p2,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS content_p3
+    FROM 
+        COCT42_AM.AM_API a
+        JOIN coct42_reg.reg_path p
+            ON p.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
+        JOIN coct42_reg.reg_resource r
+            ON r.reg_path_id = p.reg_path_id
+            AND r.reg_name = 'api'
+            AND p.reg_path_value = (
+                SELECT p2.reg_path_value
+                FROM coct42_reg.reg_path p2
+                JOIN coct42_reg.reg_resource r2
+                    ON r2.reg_path_id = p2.reg_path_id
+                    AND r2.reg_name = 'api'
+                WHERE p2.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
+                ORDER BY TO_NUMBER(REGEXP_SUBSTR(p2.reg_path_value, '\d+$')) DESC
+                FETCH FIRST 1 ROW ONLY
+            )
+        JOIN coct42_reg.reg_content c ON c.reg_content_id = r.reg_content_id
+    FETCH FIRST 10 ROWS ONLY
+),
+extracted AS (
+    SELECT
+        API_NAME,
+        API_UUID,
+        COALESCE(
+            REGEXP_SUBSTR(content_p1 || content_p2, '<inSequence>(.*?)</inSequence>',   1, 1, 'n', 1),
+            REGEXP_SUBSTR(content_p2 || content_p3, '<inSequence>(.*?)</inSequence>',   1, 1, 'n', 1),
+            'N/A'
+        ) AS inSequence,
+        COALESCE(
+            REGEXP_SUBSTR(content_p1 || content_p2, '<outSequence>(.*?)</outSequence>', 1, 1, 'n', 1),
+            REGEXP_SUBSTR(content_p2 || content_p3, '<outSequence>(.*?)</outSequence>', 1, 1, 'n', 1),
+            'N/A'
+        ) AS outSequence
+    FROM api_sample
+)
+SELECT
+    e.API_NAME,
+    e.inSequence,
+    e.outSequence,
+    -- in sequence raw content up to 6000 bytes
+    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(ci.reg_content_data, 2000, 1)))    ||
+    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(ci.reg_content_data, 2000, 2001))) ||
+    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(ci.reg_content_data, 2000, 4001))) AS in_seq_raw_content,
+    -- out sequence raw content up to 6000 bytes
+    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(co.reg_content_data, 2000, 1)))    ||
+    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(co.reg_content_data, 2000, 2001))) ||
+    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(co.reg_content_data, 2000, 4001))) AS out_seq_raw_content
+FROM extracted e
+LEFT JOIN coct42_reg.reg_resource ri ON ri.reg_name = e.inSequence  || '.xml'
+LEFT JOIN coct42_reg.reg_content  ci ON ci.reg_content_id = ri.reg_content_id
+LEFT JOIN coct42_reg.reg_resource ro ON ro.reg_name = e.outSequence || '.xml'
+LEFT JOIN coct42_reg.reg_content  co ON co.reg_content_id = ro.reg_content_id
+WHERE e.inSequence != 'N/A' 
+   OR e.outSequence != 'N/A'
+;
