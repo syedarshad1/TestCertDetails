@@ -1,130 +1,23 @@
-WITH api_content AS (
-    SELECT 
-        a.API_NAME,
-        a.CONTEXT,
-        a.ORGANIZATION,
-        a.API_UUID,
-        r.reg_name,
-        r.reg_content_id,
-        p.reg_path_value,
-        -- Keep each chunk separate as VARCHAR2, no concatenation here
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS content_p1,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS content_p2,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS content_p3
-    FROM 
-        COCT42_AM.AM_API a
-        JOIN coct42_reg.reg_path p
-            ON p.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
-        JOIN coct42_reg.reg_resource r
-            ON r.reg_path_id = p.reg_path_id
-            AND r.reg_name = 'api'
-            AND p.reg_path_value = (
-                SELECT p2.reg_path_value
-                FROM coct42_reg.reg_path p2
-                JOIN coct42_reg.reg_resource r2
-                    ON r2.reg_path_id = p2.reg_path_id
-                    AND r2.reg_name = 'api'
-                WHERE p2.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
-                ORDER BY TO_NUMBER(REGEXP_SUBSTR(p2.reg_path_value, '\d+$')) DESC
-                FETCH FIRST 1 ROW ONLY
-            )
-        JOIN coct42_reg.reg_content c
-            ON c.reg_content_id = r.reg_content_id
-    WHERE 
-        a.API_UUID = 'c6f3df68-f5da-4d89-979e-f163db878f0a'
-),
-extracted AS (
-    SELECT 
-        API_NAME,
-        CONTEXT,
-        ORGANIZATION,
-        API_UUID,
-        reg_name,
-        reg_content_id,
-        reg_path_value,
-        content_p1, content_p2, content_p3,
-        -- REGEXP on each chunk separately, take first non-null
-        COALESCE(
-            REGEXP_SUBSTR(content_p1 || content_p2, '<endpointConfig>(.*?)</endpointConfig>', 1, 1, 'n', 1),
-            REGEXP_SUBSTR(content_p2 || content_p3, '<endpointConfig>(.*?)</endpointConfig>', 1, 1, 'n', 1)
-        ) AS EndpointConfig,
-        COALESCE(
-            REGEXP_SUBSTR(content_p1 || content_p2, '<inSequence>(.*?)</inSequence>', 1, 1, 'n', 1),
-            REGEXP_SUBSTR(content_p2 || content_p3, '<inSequence>(.*?)</inSequence>', 1, 1, 'n', 1)
-        ) AS inSequence,
-        COALESCE(
-            REGEXP_SUBSTR(content_p1 || content_p2, '<outSequence>(.*?)</outSequence>', 1, 1, 'n', 1),
-            REGEXP_SUBSTR(content_p2 || content_p3, '<outSequence>(.*?)</outSequence>', 1, 1, 'n', 1)
-        ) AS outSequence
-    FROM api_content
-),
-in_seq_content AS (
-    SELECT 
-        r.reg_name,
-        r.reg_content_id,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS seq_p1,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS seq_p2,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS seq_p3
-    FROM coct42_reg.reg_resource r
-    JOIN coct42_reg.reg_path p    ON r.reg_path_id = p.reg_path_id
-    JOIN coct42_reg.reg_content c ON c.reg_content_id = r.reg_content_id
-    WHERE p.reg_path_value = '/_system/governance/apimgt/customsequences/in'
-      AND r.reg_media_type  = 'application/vnd.wso2.sequence'
-),
-out_seq_content AS (
-    SELECT 
-        r.reg_name,
-        r.reg_content_id,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS seq_p1,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS seq_p2,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS seq_p3
-    FROM coct42_reg.reg_resource r
-    JOIN coct42_reg.reg_path p    ON r.reg_path_id = p.reg_path_id
-    JOIN coct42_reg.reg_content c ON c.reg_content_id = r.reg_content_id
-    WHERE p.reg_path_value = '/_system/governance/apimgt/customsequences/out'
-      AND r.reg_media_type  = 'application/vnd.wso2.sequence'
-)
-SELECT
-    e.API_NAME,
-    e.CONTEXT,
-    e.ORGANIZATION,
-    e.API_UUID,
-    e.reg_name,
-    CASE 
-        WHEN REGEXP_LIKE(e.EndpointConfig,          'suspend', 'i') THEN 'Suspension Enabled'
-        WHEN REGEXP_LIKE(i.seq_p1 || i.seq_p2,      'suspend', 'i') THEN 'Suspension Enabled'
-        WHEN REGEXP_LIKE(i.seq_p2 || i.seq_p3,      'suspend', 'i') THEN 'Suspension Enabled'
-        WHEN REGEXP_LIKE(o.seq_p1 || o.seq_p2,      'suspend', 'i') THEN 'Suspension Enabled'
-        WHEN REGEXP_LIKE(o.seq_p2 || o.seq_p3,      'suspend', 'i') THEN 'Suspension Enabled'
-        ELSE 'Default Suspension'
-    END AS SuspensionLogic,
-    CASE
-        WHEN REGEXP_LIKE(e.EndpointConfig,     'suspend', 'i') AND
-            (REGEXP_LIKE(i.seq_p1||i.seq_p2,   'suspend', 'i') OR REGEXP_LIKE(i.seq_p2||i.seq_p3, 'suspend', 'i')) AND
-            (REGEXP_LIKE(o.seq_p1||o.seq_p2,   'suspend', 'i') OR REGEXP_LIKE(o.seq_p2||o.seq_p3, 'suspend', 'i'))
-            THEN 'EndpointConfig, ' || e.inSequence || ', ' || e.outSequence
-        WHEN REGEXP_LIKE(e.EndpointConfig,     'suspend', 'i') AND
-            (REGEXP_LIKE(i.seq_p1||i.seq_p2,   'suspend', 'i') OR REGEXP_LIKE(i.seq_p2||i.seq_p3, 'suspend', 'i'))
-            THEN 'EndpointConfig, ' || e.inSequence
-        WHEN REGEXP_LIKE(e.EndpointConfig,     'suspend', 'i') AND
-            (REGEXP_LIKE(o.seq_p1||o.seq_p2,   'suspend', 'i') OR REGEXP_LIKE(o.seq_p2||o.seq_p3, 'suspend', 'i'))
-            THEN 'EndpointConfig, ' || e.outSequence
-        WHEN (REGEXP_LIKE(i.seq_p1||i.seq_p2,  'suspend', 'i') OR REGEXP_LIKE(i.seq_p2||i.seq_p3, 'suspend', 'i')) AND
-             (REGEXP_LIKE(o.seq_p1||o.seq_p2,  'suspend', 'i') OR REGEXP_LIKE(o.seq_p2||o.seq_p3, 'suspend', 'i'))
-            THEN e.inSequence || ', ' || e.outSequence
-        WHEN REGEXP_LIKE(e.EndpointConfig,     'suspend', 'i') THEN 'EndpointConfig'
-        WHEN  REGEXP_LIKE(i.seq_p1||i.seq_p2,  'suspend', 'i') OR 
-              REGEXP_LIKE(i.seq_p2||i.seq_p3,  'suspend', 'i') THEN e.inSequence
-        WHEN  REGEXP_LIKE(o.seq_p1||o.seq_p2,  'suspend', 'i') OR 
-              REGEXP_LIKE(o.seq_p2||o.seq_p3,  'suspend', 'i') THEN e.outSequence
-        ELSE 'None'
-    END AS SuspensionSource,
-    e.reg_content_id,
-    e.reg_path_value,
-    e.EndpointConfig,
-    e.inSequence,
-    e.outSequence
-FROM extracted e
-LEFT JOIN in_seq_content i  ON i.reg_name = e.inSequence  || '.xml'
-LEFT JOIN out_seq_content o ON o.reg_name = e.outSequence || '.xml'
-;
+Perfect!
+
+now problem is its not always suspend login in custom sequence, something custom sequence file contains endpoint xml file where suspension logic defined
+
+eg: Now problem is path and name is not always same
+    <property expression="get-property('registry', 'conf:repository/resources/endpoints/als_endpoints.xml')" name="target_endpoint" scope="default" type="OM"/>
+
+then we have search for suspend in those endpoint xml file like
+
+SELECT   r.reg_content_id,  r.reg_uuid,  r.reg_name,  r.reg_media_type,  p.reg_path_value,  r.reg_last_updated_time
+FROM coct42_reg.reg_resource r
+JOIN coct42_reg.reg_path p
+  ON r.reg_path_id = p.reg_path_id
+WHERE --r.reg_name like  '%SNAP-Recipient%'
+      --p.reg_path_value LIKE '%c6f3df68-f5da-4d89-979e-f163db878f0a%'
+  --AND p.reg_path_value LIKE '%6f8d9aa2-077e-4b7a-9106-ba78d013dc5e%'
+    r.reg_name like  '%als_endpoints%'
+     --r.reg_uuid like  '%822bb236-3b62-4a86-88aa-c4c8521c9d52%'
+  --AND p.reg_path_value  LIKE '%Billpay%'
+  --AND r.reg_tenant_id = 12
+ORDER BY r.reg_last_updated_time DESC;
+
+SELECT * FROM coct42_reg.reg_content c WHERE c.reg_content_id = 14071047; -- search for suspend and update the supensionlogic and suspensionsource accordindly
