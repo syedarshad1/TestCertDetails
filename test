@@ -1,1 +1,331 @@
-Found suspend	Found suspendDuration
+WITH reg_apis AS (
+  SELECT
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/([0-9a-fA-F-]{36})/',
+      1, 1, NULL, 1)             AS api_uuid,
+    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+      1, 1, NULL, 1))            AS rev,
+    r.reg_content_id
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  r.reg_name = 'api'
+    AND  p.reg_path_value LIKE
+         '/_system/governance/apimgt/applicationdata/apis/%'
+),
+latest_rev AS (
+  SELECT
+    api_uuid,
+    MAX(rev)                      AS latest_rev,
+    MAX(reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
+  FROM   reg_apis
+  WHERE  api_uuid IS NOT NULL
+  GROUP BY api_uuid
+),
+api_analysis AS (
+  -- Search BLOB directly with UTL_RAW.CAST_TO_RAW
+  -- Decode chunks for value extraction only
+  SELECT
+    lr.api_uuid,
+    -- endpointConfig: decode from position found in BLOB
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('endpointConfig')) > 0
+        THEN REPLACE(REPLACE(REPLACE(REPLACE(
+               utl_raw.cast_to_varchar2(
+                 dbms_lob.substr(c.reg_content_data, 2000,
+                   DBMS_LOB.INSTR(c.reg_content_data,
+                     UTL_RAW.CAST_TO_RAW('endpointConfig')))),
+             CHR(10),''),CHR(13),''),CHR(9),''),CHR(34),'')
+      ELSE NULL
+    END                           AS api_endpoint_config,
+    -- suspend found in blob
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('suspend')) > 0
+        THEN 1 ELSE 0
+    END                           AS api_has_suspend,
+    -- suspendDuration=0 (JSON style)
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('suspendDuration":"0"')) > 0
+        OR   DBMS_LOB.INSTR(c.reg_content_data,
+               UTL_RAW.CAST_TO_RAW('suspendDuration>0<')) > 0
+        THEN 1 ELSE 0
+    END                           AS api_suspend_dur_zero,
+    -- suspendMaxDuration=0
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('suspendMaxDuration":"0"')) > 0
+        OR   DBMS_LOB.INSTR(c.reg_content_data,
+               UTL_RAW.CAST_TO_RAW('suspendMaxDuration>0<')) > 0
+        THEN 1 ELSE 0
+    END                           AS api_suspend_max_zero,
+    -- errorCode=-1
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('"-1"')) > 0
+        OR   DBMS_LOB.INSTR(c.reg_content_data,
+               UTL_RAW.CAST_TO_RAW('errorCodes>-1<')) > 0
+        THEN 1 ELSE 0
+    END                           AS api_error_minus1,
+    -- suspendErrorCode
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('suspendErrorCode')) > 0
+        THEN 1 ELSE 0
+    END                           AS api_has_error_code,
+    -- actionDuration value extraction
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('actionDuration":"')) > 0
+        THEN SUBSTR(
+               utl_raw.cast_to_varchar2(
+                 dbms_lob.substr(c.reg_content_data, 30,
+                   DBMS_LOB.INSTR(c.reg_content_data,
+                     UTL_RAW.CAST_TO_RAW('actionDuration":"'))+17)),
+               1,
+               INSTR(
+                 utl_raw.cast_to_varchar2(
+                   dbms_lob.substr(c.reg_content_data, 30,
+                     DBMS_LOB.INSTR(c.reg_content_data,
+                       UTL_RAW.CAST_TO_RAW('actionDuration":"'))+17)),
+                 CHR(34)) - 1)
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('actionDuration>')) > 0
+        THEN SUBSTR(
+               utl_raw.cast_to_varchar2(
+                 dbms_lob.substr(c.reg_content_data, 30,
+                   DBMS_LOB.INSTR(c.reg_content_data,
+                     UTL_RAW.CAST_TO_RAW('actionDuration>'))+15)),
+               1,
+               INSTR(
+                 utl_raw.cast_to_varchar2(
+                   dbms_lob.substr(c.reg_content_data, 30,
+                     DBMS_LOB.INSTR(c.reg_content_data,
+                       UTL_RAW.CAST_TO_RAW('actionDuration>'))+15)),
+                 '<') - 1)
+      ELSE NULL
+    END                           AS api_action_duration
+  FROM   latest_rev lr
+  LEFT JOIN coct42_reg.reg_content c
+    ON   c.reg_content_id = lr.reg_content_id
+),
+seq_resources AS (
+  SELECT
+    lr.api_uuid,
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/(in|out|fault)$',
+      1, 1, 'i', 1)             AS res_type,
+    r.reg_name                   AS seq_name,
+    c.reg_content_id             AS seq_content_id
+  FROM   latest_rev lr
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_value IN (
+           '/_system/governance/apimgt/applicationdata/apis/'
+             || lr.api_uuid || '/' || lr.latest_rev || '/in',
+           '/_system/governance/apimgt/applicationdata/apis/'
+             || lr.api_uuid || '/' || lr.latest_rev || '/out',
+           '/_system/governance/apimgt/applicationdata/apis/'
+             || lr.api_uuid || '/' || lr.latest_rev || '/fault'
+         )
+  JOIN   coct42_reg.reg_resource r
+    ON   r.reg_path_id    = p.reg_path_id
+    AND  r.reg_content_id IS NOT NULL
+  JOIN   coct42_reg.reg_content c
+    ON   c.reg_content_id = r.reg_content_id
+),
+seq_analysis AS (
+  -- Search sequence BLOBs directly with UTL_RAW.CAST_TO_RAW
+  SELECT
+    sr.api_uuid,
+    sr.res_type,
+    sr.seq_name,
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('suspend')) > 0
+        THEN 1 ELSE 0
+    END                           AS has_suspend,
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('suspendDuration":"0"')) > 0
+        OR   DBMS_LOB.INSTR(c.reg_content_data,
+               UTL_RAW.CAST_TO_RAW('suspendDuration>0<')) > 0
+        THEN 1 ELSE 0
+    END                           AS suspend_dur_zero,
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('suspendMaxDuration":"0"')) > 0
+        OR   DBMS_LOB.INSTR(c.reg_content_data,
+               UTL_RAW.CAST_TO_RAW('suspendMaxDuration>0<')) > 0
+        THEN 1 ELSE 0
+    END                           AS suspend_max_zero,
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('"-1"')) > 0
+        OR   DBMS_LOB.INSTR(c.reg_content_data,
+               UTL_RAW.CAST_TO_RAW('errorCodes>-1<')) > 0
+        THEN 1 ELSE 0
+    END                           AS error_code_minus1,
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('suspendErrorCode')) > 0
+        THEN 1 ELSE 0
+    END                           AS has_error_code,
+    -- endpointConfig from sequence blob
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('endpointConfig')) > 0
+        THEN REPLACE(REPLACE(REPLACE(REPLACE(
+               utl_raw.cast_to_varchar2(
+                 dbms_lob.substr(c.reg_content_data, 2000,
+                   DBMS_LOB.INSTR(c.reg_content_data,
+                     UTL_RAW.CAST_TO_RAW('endpointConfig')))),
+             CHR(10),''),CHR(13),''),CHR(9),''),CHR(34),'')
+      ELSE NULL
+    END                           AS seq_endpoint_config,
+    -- actionDuration from sequence blob
+    CASE
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('actionDuration":"')) > 0
+        THEN SUBSTR(
+               utl_raw.cast_to_varchar2(
+                 dbms_lob.substr(c.reg_content_data, 30,
+                   DBMS_LOB.INSTR(c.reg_content_data,
+                     UTL_RAW.CAST_TO_RAW('actionDuration":"'))+17)),
+               1,
+               INSTR(
+                 utl_raw.cast_to_varchar2(
+                   dbms_lob.substr(c.reg_content_data, 30,
+                     DBMS_LOB.INSTR(c.reg_content_data,
+                       UTL_RAW.CAST_TO_RAW('actionDuration":"'))+17)),
+                 CHR(34)) - 1)
+      WHEN DBMS_LOB.INSTR(c.reg_content_data,
+             UTL_RAW.CAST_TO_RAW('actionDuration>')) > 0
+        THEN SUBSTR(
+               utl_raw.cast_to_varchar2(
+                 dbms_lob.substr(c.reg_content_data, 30,
+                   DBMS_LOB.INSTR(c.reg_content_data,
+                     UTL_RAW.CAST_TO_RAW('actionDuration>'))+15)),
+               1,
+               INSTR(
+                 utl_raw.cast_to_varchar2(
+                   dbms_lob.substr(c.reg_content_data, 30,
+                     DBMS_LOB.INSTR(c.reg_content_data,
+                       UTL_RAW.CAST_TO_RAW('actionDuration>'))+15)),
+                 '<') - 1)
+      ELSE NULL
+    END                           AS action_duration
+  FROM   seq_resources sr
+  JOIN   coct42_reg.reg_content c
+    ON   c.reg_content_id = sr.seq_content_id
+),
+seq_suspend AS (
+  SELECT
+    api_uuid,
+    MAX(seq_name) KEEP
+      (DENSE_RANK FIRST ORDER BY
+        CASE res_type WHEN 'in' THEN 1
+                      WHEN 'out' THEN 2
+                      WHEN 'fault' THEN 3 END,
+        has_suspend DESC)         AS seq_name,
+    MAX(has_suspend)              AS has_suspend,
+    MAX(suspend_dur_zero) KEEP
+      (DENSE_RANK FIRST ORDER BY
+        CASE res_type WHEN 'in' THEN 1
+                      WHEN 'out' THEN 2
+                      WHEN 'fault' THEN 3 END,
+        has_suspend DESC)         AS suspend_dur_zero,
+    MAX(suspend_max_zero) KEEP
+      (DENSE_RANK FIRST ORDER BY
+        CASE res_type WHEN 'in' THEN 1
+                      WHEN 'out' THEN 2
+                      WHEN 'fault' THEN 3 END,
+        has_suspend DESC)         AS suspend_max_zero,
+    MAX(error_code_minus1) KEEP
+      (DENSE_RANK FIRST ORDER BY
+        CASE res_type WHEN 'in' THEN 1
+                      WHEN 'out' THEN 2
+                      WHEN 'fault' THEN 3 END,
+        has_suspend DESC)         AS error_code_minus1,
+    MAX(has_error_code) KEEP
+      (DENSE_RANK FIRST ORDER BY
+        CASE res_type WHEN 'in' THEN 1
+                      WHEN 'out' THEN 2
+                      WHEN 'fault' THEN 3 END,
+        has_suspend DESC)         AS has_error_code,
+    MAX(seq_endpoint_config) KEEP
+      (DENSE_RANK FIRST ORDER BY
+        CASE res_type WHEN 'in' THEN 1
+                      WHEN 'out' THEN 2
+                      WHEN 'fault' THEN 3 END,
+        CASE WHEN seq_endpoint_config IS NOT NULL
+          THEN 0 ELSE 1 END)      AS seq_endpoint_config,
+    MAX(action_duration) KEEP
+      (DENSE_RANK FIRST ORDER BY
+        CASE res_type WHEN 'in' THEN 1
+                      WHEN 'out' THEN 2
+                      WHEN 'fault' THEN 3 END,
+        CASE WHEN action_duration IS NOT NULL
+          THEN 0 ELSE 1 END)      AS seq_action_duration
+  FROM   seq_analysis
+  GROUP BY api_uuid
+)
+SELECT
+  a.API_NAME,
+  a.API_VERSION,
+  a.CONTEXT,
+  a.STATUS,
+  a.ORGANIZATION                  AS TENANT,
+  a.UPDATED_TIME,
+  CASE
+    WHEN ec.api_endpoint_config IS NULL
+      THEN 'No registry entry'
+    WHEN ss.has_suspend=1
+      AND (ss.suspend_dur_zero=1 OR ss.suspend_max_zero=1)
+      AND  ss.error_code_minus1=1
+      THEN 'Explicit disable (all error codes) - seq: '||ss.seq_name
+    WHEN ss.has_suspend=1
+      AND (ss.suspend_dur_zero=1 OR ss.suspend_max_zero=1)
+      AND  ss.has_error_code=1
+      THEN 'Explicit disable (specific error code) - seq: '||ss.seq_name
+    WHEN ss.has_suspend=1
+      THEN 'Active suspension - seq: '||ss.seq_name
+    WHEN ec.api_has_suspend=1
+      AND (ec.api_suspend_dur_zero=1 OR ec.api_suspend_max_zero=1)
+      AND  ec.api_error_minus1=1
+      THEN 'Explicit disable (all error codes) - endpointConfig'
+    WHEN ec.api_has_suspend=1
+      AND (ec.api_suspend_dur_zero=1 OR ec.api_suspend_max_zero=1)
+      AND  ec.api_has_error_code=1
+      THEN 'Explicit disable (specific error code) - endpointConfig'
+    WHEN ec.api_has_suspend=1
+      THEN 'Active suspension - endpointConfig'
+    ELSE 'Default suspension'
+  END                             AS SUSPENSION_LOGIC,
+  CASE
+    WHEN ss.has_suspend=1     THEN ss.seq_name
+    WHEN ec.api_has_suspend=1 THEN 'api'
+    ELSE NULL
+  END                             AS SEQUENCE_FILE,
+  CASE
+    WHEN ss.has_suspend=1     THEN 'Custom sequence'
+    WHEN ec.api_has_suspend=1 THEN 'endpointConfig'
+    ELSE NULL
+  END                             AS SEQUENCE_TYPE,
+  COALESCE(
+    ss.seq_endpoint_config,
+    ec.api_endpoint_config)        AS ENDPOINT_CONFIG,
+  COALESCE(
+    ss.seq_action_duration,
+    ec.api_action_duration,
+    '120000ms (synapse global default)')
+                                  AS TIMEOUT_MS
+FROM   COCT42_AM.AM_API a
+LEFT JOIN api_analysis ec
+  ON   ec.api_uuid = a.API_UUID
+LEFT JOIN seq_suspend ss
+  ON   ss.api_uuid = a.API_UUID
+ORDER BY a.ORGANIZATION, SUSPENSION_LOGIC, a.API_NAME, a.API_VERSION;
