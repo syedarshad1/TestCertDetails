@@ -1,42 +1,56 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<sequence name="aaa_als_seq_in" trace="disable" xmlns="http://ws.apache.org/ns/synapse">
-    <property expression="get-property('axis2','REST_URL_POSTFIX')" name="Resource_Path" scope="default" type="STRING"/>
-    <property expression="fn:substring-after(get-property('api.ut.application.name'), '-')" name="firmName" scope="default" type="STRING"/>
-    <property name="quote" scope="default" type="STRING" value="'"/>
-    <property expression="get-property('axis2', 'HTTP_METHOD')" name="Http_Method" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-    <property expression="$trp:uuid" name="Uuid" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-    <property expression="$trp:source-id" name="Source-id" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-    <property expression="$url:apiresponse" name="apiresponse" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-    <property name="delimiter" scope="default" type="STRING" value="/"/>
-    <property expression="fn:concat(get-property('Resource_Path'), get-property('delimiter'), get-property('Http_Method'))" name="ConcatenatedProperty" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-    <property expression="get-property('MessageID')" name="apiMessageUUID" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-    <log level="custom">
-        <property name="apiEvent" value="START"/>
-        <property expression="get-property('apiMessageUUID')" name="apiMessageID" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-        <property expression="get-property('Uuid')" name="apiClientUUID" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-        <property expression="get-property('SYSTEM_TIME')" name="apiTimestamp" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-        <property expression="get-property('Source-id')" name="Source-id" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-        <property expression="get-property('ConcatenatedProperty')" name="apiRequestPath" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-        <property expression="get-property('api.ut.userId')" name="apiUserId" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-        <property expression="fn:concat(get-property('Http_Method'), get-property('REST_API_CONTEXT'), get-property('API_ELECTED_RESOURCE'))" name="apiContext" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-        <property expression="get-property('api.ut.application.name')" name="apiAppName" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-    </log>
-    <log level="custom">
-        <property name="apiEvent" value="AFTERCUSTVLD"/>
-        <property expression="get-property('apiMessageUUID')" name="apiMessageID" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-        <property expression="get-property('Uuid')" name="apiClientUUID" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-        <property expression="get-property('SYSTEM_TIME')" name="apiTimestamp" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
-        <property expression="fn:concat('$ctx:target_endpoint//Organization[@idpfirm=', get-property('quote'), $ctx:firmName, get-property('quote'), ']/node()[@ctx=', get-property('quote'), $ctx:REST_API_CONTEXT, get-property('quote'), ']/text()')" name="sep_xpath_log1"/>
-    </log>
-    <property expression="fn:concat('$ctx:target_endpoint//Organization[@idpfirm=', get-property('quote'), $ctx:firmName, get-property('quote'), ']/node()[@ctx=', get-property('quote'), $ctx:REST_API_CONTEXT, get-property('quote'), ']/text()')" name="sep_xpath" scope="default" type="STRING"/>
-    <property expression="get-property('registry', 'conf:repository/resources/endpoints/als_endpoints.xml')" name="target_endpoint" scope="default" type="OM"/>
-    <property expression="evaluate($ctx:sep_xpath)" name="service-endpoint" scope="default" type="STRING"/>
-    <log level="custom">
-        <property expression="$ctx:Resource_Path" name="Res_Path"/>
-        <property expression="$ctx:REST_API_CONTEXT" name="Res_Ctx"/>
-        <property expression="get-property('sep_xpath')" name="sep_xpath"/>
-        <property expression="get-property('service-endpoint')" name="service-endpoint"/>
-        <property expression="fn:concat($ctx:service-endpoint, $ctx:Resource_Path)" name="To-Header"/>
-    </log>
-    <header expression="fn:concat($ctx:service-endpoint, $ctx:Resource_Path)" name="To" scope="default"/>
-</sequence>
+14071047	4ea5c5ad-c9fb-4c46-8b7a-b93ac6c9b17b	als_endpoints.xml	application/xml	/_system/config/repository/resources/endpoints	06-MAY-25 02.46.30.287000000 AM
+
+als_endpoints.xml
+
+<endpoints>
+  	<!--   BATEST  CASPH@05   -->
+	<Organization idpfirm="aaabatest">
+		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.11:3303/REST</Loan-Account-Inquiries>
+	</Organization>
+	<!--   End BATEST   -->
+	<!--   DEV  CASPH@05   -->
+	<Organization idpfirm="aaadev">
+		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.11:3303/REST</Loan-Account-Inquiries>
+	</Organization>
+	<!--   End DEV   -->
+    <!--   HTS  CASPL@00   -->
+    <Organization idpfirm="aaahts">
+		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.11:3436/REST</Loan-Account-Inquiries>
+	</Organization>
+    <!--   End HTS   -->
+    <!--   MIG  CASPU@01/CASPU@02   -->
+    <Organization idpfirm="aaamig">
+		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.21:3439/REST</Loan-Account-Inquiries>
+	</Organization>
+    <!--   End MIG   -->
+	<!--   QA   CASPH@05   -->
+	<Organization idpfirm="aaaqa">
+		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.11:3303/REST</Loan-Account-Inquiries>
+	</Organization>
+	<!--   End QA   -->
+  	<!--   SIT  CASPS@01   -->
+	<Organization idpfirm="aaasit">
+		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.21:3316/REST</Loan-Account-Inquiries>
+	</Organization>
+	<!--   End SIT   -->	
+  	<!--   SPE  CASPH@05   -->
+	<Organization idpfirm="aaabank-spe">
+		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.11:3303/REST</Loan-Account-Inquiries>
+	</Organization>
+	<!--   End SPE   -->
+  	<!--   UAT  CASPO@01  -->
+	<Organization idpfirm="aaabank-uat">
+		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.21:3441/REST</Loan-Account-Inquiries>
+	</Organization>
+	<!--   End UAT  -->
+	<!--   PROD  CASPP@01/CASPP@02   -->
+	<Organization idpfirm="aaabank">
+		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.25:3440/REST</Loan-Account-Inquiries>
+	</Organization>
+	<!--   End PROD   -->
+  	<!--   CONVERSION2  CASPO@01/CASPO@02   -->
+	<Organization idpfirm="aaabank-conversion2">
+		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.21:3441/REST</Loan-Account-Inquiries>
+	</Organization>
+	<!--   End CONVERSION2  -->
+</endpoints>
