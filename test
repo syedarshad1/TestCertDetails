@@ -4,7 +4,7 @@ WITH reg_apis AS (
       '/apis/([0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-]-[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-]-[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-]-[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-]-[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-])/',
       1, 1, NULL, 1)             AS api_uuid,
     TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
-      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+      '/apis/[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-]-[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-]-[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-]-[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-]-[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-])/([0-9]+)',
       1, 1, NULL, 1))            AS rev,
     r.reg_content_id
   FROM   coct42_reg.reg_resource r
