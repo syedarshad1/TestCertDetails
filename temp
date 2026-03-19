@@ -1,1 +1,43 @@
-<metadata xmlns="http://www.wso2.org/governance/metadata"><overview><redirectURL></redirectURL><environments>Production and Sandbox</environments><contextTemplate>/api/bill-pay/alert-services/{version}</contextTemplate><description>Endpoints to provide and update information regarding alerts.</description><authorizationHeader></authorizationHeader><type>HTTP</type><productionTps></productionTps><technicalOwner>Zebulon Wollner</technicalOwner><visibleRoles>internal/internal-user</visibleRoles><corsConfiguration>{"corsConfigurationEnabled":true,"accessControlAllowOrigins":["^https?://.*\\.fnis\\.com(:\\d\\d?\\d?\\d?\\d?)?$","^https?://.*\\.fisglobal\\.com(:\\d\\d?\\d?\\d?\\d?)?$","^https?://.*\\.prod\\.local(:\\d\\d?\\d?\\d?\\d?)?$","^https?://.*\\.fisdev\\.local(:\\d\\d?\\d?\\d?\\d?)?$","^https?://.*\\.fiscloudservices\\.com(:\\d\\d?\\d?\\d?\\d?)?$","^https?://.*\\.money-movement\\.com(:\\d\\d?\\d?\\d?\\d?)?$"],"accessControlAllowCredentials":false,"accessControlAllowHeaders":["authorization","Access-Control-Allow-Origin","Content-Type","SOAPAction","Access-Control-Allow-Options","Access-Control-Allow-Headers","Access-Control-Allow-Methods","contextToken","fe_id","locale","uuid","application_id","source_id","user_id","correlation_id","environment_id"],"accessControlAllowMethods":["GET","PUT","POST","DELETE","PATCH","OPTIONS"]}</corsConfiguration><faultSequence></faultSequence><wsdl></wsdl><subscriptionAvailability></subscriptionAvailability><isLatest>true</isLatest><tier>Bronze||Gold||Silver||Unlimited</tier><provider>api-bot</provider><endpointConfig>{"production_endpoints":{"url":"default","config":{"suspendDuration":"0","suspendErrorCode":["-1"],"suspendMaxDuration":"0"}},"sandbox_endpoints":{"url":"default","config":{"suspendDuration":"0","suspendErrorCode":["-1"],"suspendMaxDuration":"0"}},"endpoint_type":"default"}</endpointConfig><inSequence>rdp_fusion_integration_standard_endpoints_req_IN</inSequence><context>/api/bill-pay/alert-services/v1</context><sandboxTps></sandboxTps><endpointSecured>false</endpointSecured><versionType>context</versionType><endpointAuthDigest>false</endpointAuthDigest><tenants></tenants><thumbnail>/apimgt/applicationdata/provider/api-bot/AlertServices/v1/icon</thumbnail><endpointPpassword></endpointPpassword><advertiseOnly>false</advertiseOnly><visibility>restricted</visibility><wadl></wadl><technicalOwnerEmail>Zebulon.Wollner@fisglobal.com</technicalOwnerEmail><implementation>ENDPOINT</implementation><outSequence>fis_com_billpay_CORS_configuration_OUT</outSequence><businessOwnerEmail>Garima.Shandilya@fisglobal.com</businessOwnerEmail><version>v1</version><apiOwner></apiOwner><transports>https</transports><visibleTenants></visibleTenants><cacheTimeout>300</cacheTimeout><enableStore>true</enableStore><isDefaultVersion>false</isDefaultVersion><name>AlertServices</name><endpointUsername></endpointUsername><responseCaching>Disabled</responseCaching><apiSecurity>oauth2</apiSecurity><businessOwner>Garima Shandilya</businessOwner><status>PUBLISHED</status></overview><URITemplate><authType0>Any</authType0><authType1>Any</authType1><urlPattern2>/alert-preference</urlPattern2><urlPattern1>/alert-preference/alerts</urlPattern1><httpVerb1>GET</httpVerb1><urlPattern0>/alert-preference/alerts/{alertTypeId}</urlPattern0><httpVerb2>GET</httpVerb2><authType2>Any</authType2><httpVerb0>GET</httpVerb0></URITemplate></metadata>
+1. I have this table
+
+    SELECT * FROM COCT42_AM.AM_API 
+    
+    Where API_NAME, API_NAME, CONTEXT, organization, API_UUID some other fields
+
+2. Then we have below table
+
+    SELECT 
+      r.reg_content_id,
+      r.reg_uuid,
+      r.reg_name,
+      r.reg_media_type,
+      p.reg_path_value,
+      r.reg_last_updated_time
+    FROM coct42_reg.reg_resource r
+    JOIN coct42_reg.reg_path p
+      ON r.reg_path_id = p.reg_path_id
+    WHERE --r.reg_name like  '%SNAP-Recipient%'
+          p.reg_path_value LIKE '%fd1b5417-eeea-4fef-b2df-c36affe0913e%'
+      --AND p.reg_path_value LIKE '%6f8d9aa2-077e-4b7a-9106-ba78d013dc5e%'
+        --r.reg_name like  '%rdp-fusion-integration-standard-endpoints.xml%'
+         --r.reg_uuid like  '%822bb236-3b62-4a86-88aa-c4c8521c9d52%'
+      --AND p.reg_path_value  LIKE '%Billpay%'
+      --AND r.reg_tenant_id = 12
+    ORDER BY r.reg_last_updated_time DESC;
+    
+    where we have   r.reg_content_id,  r.reg_uuid,  r.reg_name,  r.reg_media_type,  p.reg_path_value,  r.reg_last_updated_time
+    
+    (reg_path_value should pick latest numeric number "/_system/governance/apimgt/applicationdata/apis/fd1b5417-eeea-4fef-b2df-c36affe0913e/2", "fd1b5417-eeea-4fef-b2df-c36affe0913e" is API_UUID and reg_name = "api")
+
+
+    example: 15781073	b3a7607d-dcdb-45ed-86da-8c562d1c883d	api	application/vnd.wso2-api+xml	/_system/governance/apimgt/applicationdata/apis/fd1b5417-eeea-4fef-b2df-c36affe0913e/2	09-AUG-25 10.29.09.794000000 AM
+
+3. Now we have to get reg_content_id from 2nd steps and search in below table
+
+    SELECT * FROM coct42_reg.reg_content c WHERE c.reg_content_id = 15781073;
+
+3. Now we need all the content from reg_content_data(this is blob datatype)
+
+4. Final output should be like
+
+    API_NAME, API_NAME, CONTEXT, organization, reg_name, reg_content_data
