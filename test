@@ -1,1 +1,3 @@
-endpointConfig>{production_endpoints:{url:default},sandbox_endpoints:{url:default},endpoint_type:default}</endpointConfig><inSequence>aaa_als_seq_in</inSequence>
+15704317	27b81949-0565-4f7f-81eb-5aa42e046261	aaa_als_seq_fault.xml	application/vnd.wso2.sequence	/_system/governance/apimgt/customsequences/fault	08-AUG-25 03.09.19.244000000 PM
+14071089	3f1cf785-3e39-4340-b148-6cd44aad927e	aaa_als_seq_out.xml	application/vnd.wso2.sequence	/_system/governance/apimgt/customsequences/out	06-MAY-25 02.46.31.270000000 AM
+14071087	822bb236-3b62-4a86-88aa-c4c8521c9d52	aaa_als_seq_in.xml	application/vnd.wso2.sequence	/_system/governance/apimgt/customsequences/in	06-MAY-25 02.46.31.225000000 AM
