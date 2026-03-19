@@ -1,13 +1,20 @@
--- Step 1: just print the raw api blob for AlertServices
+-- Use UTL_RAW.CAST_TO_RAW to search, then extract safely
 SELECT
   a.API_NAME,
   a.API_UUID,
   r.reg_content_id,
   p.reg_path_value,
-  REPLACE(REPLACE(REPLACE(
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 3000, 1)),
-  CHR(10),' '),CHR(13),''),CHR(9),' ') AS api_blob_chunk1
+  -- endpointConfig position
+  DBMS_LOB.INSTR(c.reg_content_data,
+    UTL_RAW.CAST_TO_RAW('endpointConfig'))  AS ep_config_pos,
+  -- inSequence position  
+  DBMS_LOB.INSTR(c.reg_content_data,
+    UTL_RAW.CAST_TO_RAW('inSequence'))      AS in_seq_pos,
+  -- suspend position
+  DBMS_LOB.INSTR(c.reg_content_data,
+    UTL_RAW.CAST_TO_RAW('suspend'))         AS suspend_pos,
+  -- blob size
+  DBMS_LOB.GETLENGTH(c.reg_content_data)   AS blob_size
 FROM COCT42_AM.AM_API a
 JOIN coct42_reg.reg_resource r
   ON r.reg_name = 'api'
