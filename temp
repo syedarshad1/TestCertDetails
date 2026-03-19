@@ -1,18 +1,52 @@
-SELECT 
-  r.reg_content_id,
-  r.reg_name,
-  p.reg_path_value,
-  r.reg_last_updated_time,
+WITH api_seq_name AS (
+  SELECT
+    a.API_UUID,
+    a.API_NAME,
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data,2000,1)) AS api_blob_txt,
+    SUBSTR(
+      utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,1)),
+      INSTR(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,1)),
+        '<inSequence>') + 12,
+      INSTR(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,1)),
+        '</inSequence>') -
+      INSTR(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,1)),
+        '<inSequence>') - 12
+    )                            AS in_seq_name
+  FROM COCT42_AM.AM_API a
+  JOIN coct42_reg.reg_resource r
+    ON r.reg_name = 'api'
+  JOIN coct42_reg.reg_path p
+    ON p.reg_path_id = r.reg_path_id
+    AND p.reg_path_value LIKE
+        '/_system/governance/apimgt/applicationdata/apis/'
+        || a.API_UUID || '/%'
+  JOIN coct42_reg.reg_content c
+    ON c.reg_content_id = r.reg_content_id
+  WHERE a.API_UUID = 'fd1b5417-eeea-4fef-b2df-c36affe0913e'
+    AND r.reg_content_id = (
+          SELECT MAX(r2.reg_content_id)
+          FROM coct42_reg.reg_resource r2
+          JOIN coct42_reg.reg_path p2
+            ON p2.reg_path_id = r2.reg_path_id
+          WHERE r2.reg_name = 'api'
+            AND p2.reg_path_value LIKE
+                '/_system/governance/apimgt/applicationdata/apis/'
+                || 'fd1b5417-eeea-4fef-b2df-c36affe0913e' || '/%')
+)
+SELECT
+  API_UUID,
+  API_NAME,
+  in_seq_name,
+  -- show endpointConfig area
+  SUBSTR(api_blob_txt,
+    INSTR(api_blob_txt, '<endpointConfig>'),
+    300)                         AS endpoint_config_raw,
+  -- show suspend area if exists
   CASE
-    WHEN DBMS_LOB.INSTR(c.reg_content_data,
-           UTL_RAW.CAST_TO_RAW('suspend')) > 0
-      THEN 'YES - has suspend'
-    ELSE 'No suspend'
-  END AS has_suspend
-FROM coct42_reg.reg_resource r
-JOIN coct42_reg.reg_path p
-  ON r.reg_path_id = p.reg_path_id
-JOIN coct42_reg.reg_content c
-  ON c.reg_content_id = r.reg_content_id
-WHERE r.reg_name LIKE '%endpoint%'
-ORDER BY has_suspend DESC, r.reg_last_updated_time DESC;
+    WHEN INSTR(UPPER(api_blob_txt), 'SUSPEND') > 0
+      THEN SUBSTR(api_blob_txt,
+             GREATEST(INSTR(UPPER(api_blob_txt),'SUSPEND')-20,1), 200)
+    ELSE 'No suspend in api blob'
+  END                            AS suspend_in_api
+FROM api_seq_name;
