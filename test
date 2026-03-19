@@ -1,7 +1,7 @@
 WITH reg_apis AS (
   SELECT
     REGEXP_SUBSTR(p.reg_path_value,
-      '/apis/([0-9a-fA-F-]{36})/',
+      '/apis/([0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-]-[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-]-[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-]-[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-]-[0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-][0-9a-fA-F-])/',
       1, 1, NULL, 1)             AS api_uuid,
     TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
       '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
@@ -61,7 +61,7 @@ api_analysis AS (
                  dbms_lob.substr(clob_txt, 2000,
                    DBMS_LOB.INSTR(clob_txt,
                      CHR(60)||'endpointConfig'||CHR(62)))),
-             CHR(10),''),CHR(13),''),CHR(9),''),'"','''')
+             CHR(10),''),CHR(13),''),CHR(9),''),CHR(34),'''')
       ELSE NULL
     END                           AS api_endpoint_config,
     -- suspend found in api blob
@@ -71,21 +71,21 @@ api_analysis AS (
     END                           AS api_has_suspend,
     -- suspendDuration=0
     CASE
-      WHEN DBMS_LOB.INSTR(clob_txt,'suspendDuration":"0"')>0
+      WHEN DBMS_LOB.INSTR(clob_txt,'suspendDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
         OR   DBMS_LOB.INSTR(clob_txt,
                'suspendDuration'||CHR(62)||'0'||CHR(60))>0
         THEN 1 ELSE 0
     END                           AS api_suspend_dur_zero,
     -- suspendMaxDuration=0
     CASE
-      WHEN DBMS_LOB.INSTR(clob_txt,'suspendMaxDuration":"0"')>0
+      WHEN DBMS_LOB.INSTR(clob_txt,'suspendMaxDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
         OR   DBMS_LOB.INSTR(clob_txt,
                'suspendMaxDuration'||CHR(62)||'0'||CHR(60))>0
         THEN 1 ELSE 0
     END                           AS api_suspend_max_zero,
     -- errorCode=-1
     CASE
-      WHEN DBMS_LOB.INSTR(clob_txt,'"-1"')>0
+      WHEN DBMS_LOB.INSTR(clob_txt,CHR(34)||'-1'||CHR(34))>0
         OR   DBMS_LOB.INSTR(clob_txt,
                'errorCodes'||CHR(62)||'-1'||CHR(60))>0
         THEN 1 ELSE 0
@@ -97,17 +97,17 @@ api_analysis AS (
     END                           AS api_has_error_code,
     -- actionDuration from api blob as VARCHAR2
     CASE
-      WHEN DBMS_LOB.INSTR(clob_txt,'actionDuration":"')>0
+      WHEN DBMS_LOB.INSTR(clob_txt,'actionDuration'||CHR(34)||':'||CHR(34))>0
         THEN SUBSTR(
                utl_raw.cast_to_varchar2(
                  dbms_lob.substr(clob_txt, 30,
-                   DBMS_LOB.INSTR(clob_txt,'actionDuration":"')+17)),
+                   DBMS_LOB.INSTR(clob_txt,'actionDuration'||CHR(34)||':'||CHR(34))+17)),
                1,
                INSTR(
                  utl_raw.cast_to_varchar2(
                    dbms_lob.substr(clob_txt, 30,
-                     DBMS_LOB.INSTR(clob_txt,'actionDuration":"')+17)),
-                 '"') - 1)
+                     DBMS_LOB.INSTR(clob_txt,'actionDuration'||CHR(34)||':'||CHR(34))+17)),
+                 CHR(34)) - 1)
       ELSE NULL
     END                           AS api_action_duration
   FROM   api_blob
@@ -152,27 +152,27 @@ seq_analysis AS (
         THEN 1 ELSE 0
     END                           AS has_suspend,
     CASE
-      WHEN INSTR(chunk1,'suspendDuration":"0"')>0
-        OR   INSTR(chunk2,'suspendDuration":"0"')>0
-        OR   INSTR(chunk3,'suspendDuration":"0"')>0
+      WHEN INSTR(chunk1,'suspendDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
+        OR   INSTR(chunk2,'suspendDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
+        OR   INSTR(chunk3,'suspendDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
         OR   INSTR(chunk1,'suspendDuration'||CHR(62)||'0'||CHR(60))>0
         OR   INSTR(chunk2,'suspendDuration'||CHR(62)||'0'||CHR(60))>0
         OR   INSTR(chunk3,'suspendDuration'||CHR(62)||'0'||CHR(60))>0
         THEN 1 ELSE 0
     END                           AS suspend_dur_zero,
     CASE
-      WHEN INSTR(chunk1,'suspendMaxDuration":"0"')>0
-        OR   INSTR(chunk2,'suspendMaxDuration":"0"')>0
-        OR   INSTR(chunk3,'suspendMaxDuration":"0"')>0
+      WHEN INSTR(chunk1,'suspendMaxDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
+        OR   INSTR(chunk2,'suspendMaxDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
+        OR   INSTR(chunk3,'suspendMaxDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
         OR   INSTR(chunk1,'suspendMaxDuration'||CHR(62)||'0'||CHR(60))>0
         OR   INSTR(chunk2,'suspendMaxDuration'||CHR(62)||'0'||CHR(60))>0
         OR   INSTR(chunk3,'suspendMaxDuration'||CHR(62)||'0'||CHR(60))>0
         THEN 1 ELSE 0
     END                           AS suspend_max_zero,
     CASE
-      WHEN INSTR(chunk1,'"-1"')>0
-        OR   INSTR(chunk2,'"-1"')>0
-        OR   INSTR(chunk3,'"-1"')>0
+      WHEN INSTR(chunk1,CHR(34)||'-1'||CHR(34))>0
+        OR   INSTR(chunk2,CHR(34)||'-1'||CHR(34))>0
+        OR   INSTR(chunk3,CHR(34)||'-1'||CHR(34))>0
         OR   INSTR(chunk1,'errorCodes'||CHR(62)||'-1'||CHR(60))>0
         OR   INSTR(chunk2,'errorCodes'||CHR(62)||'-1'||CHR(60))>0
         OR   INSTR(chunk3,'errorCodes'||CHR(62)||'-1'||CHR(60))>0
@@ -192,14 +192,14 @@ seq_analysis AS (
                  INSTR(chunk1,CHR(60)||'endpointConfig'||CHR(62)),
                  INSTR(chunk1,CHR(60)||'/endpointConfig'||CHR(62))-
                  INSTR(chunk1,CHR(60)||'endpointConfig'||CHR(62))+17),
-             CHR(10),''),CHR(13),''),CHR(9),''),'"','''')
+             CHR(10),''),CHR(13),''),CHR(9),''),CHR(34),'''')
       WHEN INSTR(chunk2,'endpointConfig')>0
         THEN REPLACE(REPLACE(REPLACE(REPLACE(
                SUBSTR(chunk2,
                  INSTR(chunk2,CHR(60)||'endpointConfig'||CHR(62)),
                  INSTR(chunk2,CHR(60)||'/endpointConfig'||CHR(62))-
                  INSTR(chunk2,CHR(60)||'endpointConfig'||CHR(62))+17),
-             CHR(10),''),CHR(13),''),CHR(9),''),'"','''')
+             CHR(10),''),CHR(13),''),CHR(9),''),CHR(34),'''')
       ELSE NULL
     END                           AS seq_endpoint_config,
     -- actionDuration from sequence
@@ -210,36 +210,36 @@ seq_analysis AS (
                INSTR(chunk1,CHR(60),
                  INSTR(chunk1,'actionDuration'||CHR(62))+15)-
                INSTR(chunk1,'actionDuration'||CHR(62))-15)
-      WHEN INSTR(chunk1,'actionDuration":"')>0
+      WHEN INSTR(chunk1,'actionDuration'||CHR(34)||':'||CHR(34))>0
         THEN SUBSTR(chunk1,
-               INSTR(chunk1,'actionDuration":"')+17,
-               INSTR(chunk1,'"',
-                 INSTR(chunk1,'actionDuration":"')+17)-
-               INSTR(chunk1,'actionDuration":"')-17)
+               INSTR(chunk1,'actionDuration'||CHR(34)||':'||CHR(34))+17,
+               INSTR(chunk1,CHR(34),
+                 INSTR(chunk1,'actionDuration'||CHR(34)||':'||CHR(34))+17)-
+               INSTR(chunk1,'actionDuration'||CHR(34)||':'||CHR(34))-17)
       WHEN INSTR(chunk2,'actionDuration'||CHR(62))>0
         THEN SUBSTR(chunk2,
                INSTR(chunk2,'actionDuration'||CHR(62))+15,
                INSTR(chunk2,CHR(60),
                  INSTR(chunk2,'actionDuration'||CHR(62))+15)-
                INSTR(chunk2,'actionDuration'||CHR(62))-15)
-      WHEN INSTR(chunk2,'actionDuration":"')>0
+      WHEN INSTR(chunk2,'actionDuration'||CHR(34)||':'||CHR(34))>0
         THEN SUBSTR(chunk2,
-               INSTR(chunk2,'actionDuration":"')+17,
-               INSTR(chunk2,'"',
-                 INSTR(chunk2,'actionDuration":"')+17)-
-               INSTR(chunk2,'actionDuration":"')-17)
+               INSTR(chunk2,'actionDuration'||CHR(34)||':'||CHR(34))+17,
+               INSTR(chunk2,CHR(34),
+                 INSTR(chunk2,'actionDuration'||CHR(34)||':'||CHR(34))+17)-
+               INSTR(chunk2,'actionDuration'||CHR(34)||':'||CHR(34))-17)
       WHEN INSTR(chunk3,'actionDuration'||CHR(62))>0
         THEN SUBSTR(chunk3,
                INSTR(chunk3,'actionDuration'||CHR(62))+15,
                INSTR(chunk3,CHR(60),
                  INSTR(chunk3,'actionDuration'||CHR(62))+15)-
                INSTR(chunk3,'actionDuration'||CHR(62))-15)
-      WHEN INSTR(chunk3,'actionDuration":"')>0
+      WHEN INSTR(chunk3,'actionDuration'||CHR(34)||':'||CHR(34))>0
         THEN SUBSTR(chunk3,
-               INSTR(chunk3,'actionDuration":"')+17,
-               INSTR(chunk3,'"',
-                 INSTR(chunk3,'actionDuration":"')+17)-
-               INSTR(chunk3,'actionDuration":"')-17)
+               INSTR(chunk3,'actionDuration'||CHR(34)||':'||CHR(34))+17,
+               INSTR(chunk3,CHR(34),
+                 INSTR(chunk3,'actionDuration'||CHR(34)||':'||CHR(34))+17)-
+               INSTR(chunk3,'actionDuration'||CHR(34)||':'||CHR(34))-17)
       ELSE NULL
     END                           AS action_duration
   FROM   seq_resources
