@@ -38,6 +38,18 @@ api_blob AS (
 api_analysis AS (
   SELECT
     api_uuid,
+    clob_txt,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,
+             CHR(60)||'endpointConfig'||CHR(62)) > 0
+        THEN REPLACE(REPLACE(REPLACE(REPLACE(
+               utl_raw.cast_to_varchar2(
+                 dbms_lob.substr(clob_txt, 2000,
+                   DBMS_LOB.INSTR(clob_txt,
+                     CHR(60)||'endpointConfig'||CHR(62)))),
+             CHR(10),''),CHR(13),''),CHR(9),''),CHR(34),'')
+      ELSE NULL
+    END                           AS api_endpoint_config,
     CASE
       WHEN DBMS_LOB.INSTR(UPPER(clob_txt),'SUSPEND')>0
         THEN 1 ELSE 0
@@ -48,88 +60,41 @@ api_analysis AS (
         OR   DBMS_LOB.INSTR(clob_txt,
                'suspendDuration'||CHR(62)||'0'||CHR(60))>0
         THEN 1 ELSE 0
-    END                           AS api_suspend_dur_zero
+    END                           AS api_suspend_dur_zero,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,
+             'suspendMaxDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
+        OR   DBMS_LOB.INSTR(clob_txt,
+               'suspendMaxDuration'||CHR(62)||'0'||CHR(60))>0
+        THEN 1 ELSE 0
+    END                           AS api_suspend_max_zero,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,CHR(34)||'-1'||CHR(34))>0
+        OR   DBMS_LOB.INSTR(clob_txt,
+               'errorCodes'||CHR(62)||'-1'||CHR(60))>0
+        THEN 1 ELSE 0
+    END                           AS api_error_minus1,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,'suspendErrorCode')>0
+        THEN 1 ELSE 0
+    END                           AS api_has_error_code,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,
+             'actionDuration'||CHR(34)||':'||CHR(34))>0
+        THEN SUBSTR(
+               utl_raw.cast_to_varchar2(
+                 dbms_lob.substr(clob_txt, 30,
+                   DBMS_LOB.INSTR(clob_txt,
+                     'actionDuration'||CHR(34)||':'||CHR(34))+17)),
+               1,
+               INSTR(
+                 utl_raw.cast_to_varchar2(
+                   dbms_lob.substr(clob_txt, 30,
+                     DBMS_LOB.INSTR(clob_txt,
+                       'actionDuration'||CHR(34)||':'||CHR(34))+17)),
+                 CHR(34)) - 1)
+      ELSE NULL
+    END                           AS api_action_duration
   FROM   api_blob
 )
 SELECT COUNT(*) FROM api_analysis;
-
-WITH reg_apis AS (
-  SELECT
-    REGEXP_SUBSTR(p.reg_path_value,
-      '/apis/([0-9a-fA-F-]{36})/',
-      1, 1, NULL, 1)             AS api_uuid,
-    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
-      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
-      1, 1, NULL, 1))            AS rev,
-    r.reg_content_id
-  FROM   coct42_reg.reg_resource r
-  JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id = r.reg_path_id
-  WHERE  r.reg_name = 'api'
-    AND  p.reg_path_value LIKE
-         '/_system/governance/apimgt/applicationdata/apis/%'
-),
-latest_rev AS (
-  SELECT
-    api_uuid,
-    MAX(rev)                      AS latest_rev,
-    MAX(reg_content_id) KEEP
-      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
-  FROM   reg_apis
-  WHERE  api_uuid IS NOT NULL
-  GROUP BY api_uuid
-),
-seq_resources AS (
-  SELECT
-    lr.api_uuid,
-    REGEXP_SUBSTR(p.reg_path_value,
-      '/(in|out|fault)$',
-      1, 1, 'i', 1)             AS res_type,
-    r.reg_name                   AS seq_name,
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data,2000,1))    AS chunk1,
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data,2000,2001))  AS chunk2,
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data,2000,4001))  AS chunk3
-  FROM   latest_rev lr
-  JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_value IN (
-           '/_system/governance/apimgt/applicationdata/apis/'
-             || lr.api_uuid || '/' || lr.latest_rev || '/in',
-           '/_system/governance/apimgt/applicationdata/apis/'
-             || lr.api_uuid || '/' || lr.latest_rev || '/out',
-           '/_system/governance/apimgt/applicationdata/apis/'
-             || lr.api_uuid || '/' || lr.latest_rev || '/fault'
-         )
-  JOIN   coct42_reg.reg_resource r
-    ON   r.reg_path_id    = p.reg_path_id
-    AND  r.reg_content_id IS NOT NULL
-  JOIN   coct42_reg.reg_content c
-    ON   c.reg_content_id = r.reg_content_id
-),
-seq_analysis AS (
-  SELECT
-    api_uuid, res_type, seq_name,
-    CASE
-      WHEN INSTR(UPPER(chunk1),'SUSPEND')>0
-        OR   INSTR(UPPER(chunk2),'SUSPEND')>0
-        OR   INSTR(UPPER(chunk3),'SUSPEND')>0
-        THEN 1 ELSE 0
-    END                           AS has_suspend,
-    CASE
-      WHEN INSTR(chunk1,'suspendDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
-        OR   INSTR(chunk2,'suspendDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
-        OR   INSTR(chunk3,'suspendDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
-        THEN 1 ELSE 0
-    END                           AS suspend_dur_zero,
-    CASE
-      WHEN INSTR(chunk1,CHR(34)||'-1'||CHR(34))>0
-        OR   INSTR(chunk2,CHR(34)||'-1'||CHR(34))>0
-        OR   INSTR(chunk3,CHR(34)||'-1'||CHR(34))>0
-        THEN 1 ELSE 0
-    END                           AS error_code_minus1
-  FROM   seq_resources
-)
-SELECT COUNT(*) FROM seq_analysis;
-
