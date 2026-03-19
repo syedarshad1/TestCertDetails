@@ -1,58 +1,18 @@
-SELECT
-  API_UUID,
-  API_NAME,
-  API_VERSION,
-  CONTEXT,
-  ORGANIZATION
-FROM   COCT42_AM.AM_API
-WHERE  API_NAME    = 'Customer-Relationship'
-  AND  API_VERSION = 'v5.6'
-  AND  CONTEXT     = '/t/paypal.com/soap/enterprise-customer/relationship-services/v5.6';
-
-SELECT
+SELECT 
+  r.reg_content_id,
+  r.reg_uuid,
   r.reg_name,
   r.reg_media_type,
   p.reg_path_value,
-  r.reg_content_id,
   r.reg_last_updated_time
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-WHERE  p.reg_path_value LIKE
-       '%<paste-uuid-here>%'
+FROM coct42_reg.reg_resource r
+JOIN coct42_reg.reg_path p
+  ON r.reg_path_id = p.reg_path_id
+WHERE --r.reg_name like  '%SNAP-Recipient%'
+      --p.reg_path_value LIKE '%c6f3df68-f5da-4d89-979e-f163db878f0a%'
+  --AND p.reg_path_value LIKE '%6f8d9aa2-077e-4b7a-9106-ba78d013dc5e%'
+    r.reg_name like  '%endpoint%'
+     --r.reg_uuid like  '%822bb236-3b62-4a86-88aa-c4c8521c9d52%'
+  --AND p.reg_path_value  LIKE '%Billpay%'
+  --AND r.reg_tenant_id = 12
 ORDER BY r.reg_last_updated_time DESC;
-
-SELECT
-  r.reg_name,
-  r.reg_media_type,
-  p.reg_path_value,
-  r.reg_content_id,
-  r.reg_last_updated_time
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-WHERE  p.reg_path_value LIKE
-         '/_system/governance/apimgt/applicationdata/provider/%'
-  AND  (
-         p.reg_path_value LIKE '%Customer-Relationship%'
-      OR r.reg_name       LIKE '%Customer-Relationship%'
-       )
-ORDER BY p.reg_path_value, r.reg_name;
-
-SELECT
-  r.reg_name,
-  r.reg_media_type,
-  p.reg_path_value,
-  r.reg_content_id,
-  r.reg_last_updated_time
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-WHERE  p.reg_path_value LIKE
-         '/_system/config/apimgt/applicationdata/sequences/%'
-  AND  (
-         p.reg_path_value LIKE '%Customer-Relationship%'
-      OR r.reg_name       LIKE '%Customer%'
-       )
-ORDER BY p.reg_path_value, r.reg_name;
-
