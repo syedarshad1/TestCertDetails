@@ -1,17 +1,42 @@
--- Decode aaa_als_seq_in.xml to see URL, timeout, suspend
-SELECT
-  r.reg_name,
-  r.reg_content_id,
-  REPLACE(REPLACE(REPLACE(
-    utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 1)),
-  CHR(10),' '),CHR(13),''),CHR(9),' ') AS seq_content
-FROM   coct42_reg.reg_resource r
-JOIN   coct42_reg.reg_path p
-  ON   p.reg_path_id = r.reg_path_id
-JOIN   coct42_reg.reg_content c
-  ON   c.reg_content_id = r.reg_content_id
-WHERE  r.reg_name = 'aaa_als_seq_in.xml'
-  AND  p.reg_path_value LIKE '%customsequences/in%'
-ORDER BY r.reg_last_updated_time DESC
-FETCH FIRST 1 ROWS ONLY;
+<?xml version="1.0" encoding="UTF-8"?>
+<sequence name="aaa_als_seq_in" trace="disable" xmlns="http://ws.apache.org/ns/synapse">
+    <property expression="get-property('axis2','REST_URL_POSTFIX')" name="Resource_Path" scope="default" type="STRING"/>
+    <property expression="fn:substring-after(get-property('api.ut.application.name'), '-')" name="firmName" scope="default" type="STRING"/>
+    <property name="quote" scope="default" type="STRING" value="'"/>
+    <property expression="get-property('axis2', 'HTTP_METHOD')" name="Http_Method" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    <property expression="$trp:uuid" name="Uuid" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    <property expression="$trp:source-id" name="Source-id" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    <property expression="$url:apiresponse" name="apiresponse" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    <property name="delimiter" scope="default" type="STRING" value="/"/>
+    <property expression="fn:concat(get-property('Resource_Path'), get-property('delimiter'), get-property('Http_Method'))" name="ConcatenatedProperty" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    <property expression="get-property('MessageID')" name="apiMessageUUID" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    <log level="custom">
+        <property name="apiEvent" value="START"/>
+        <property expression="get-property('apiMessageUUID')" name="apiMessageID" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('Uuid')" name="apiClientUUID" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('SYSTEM_TIME')" name="apiTimestamp" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('Source-id')" name="Source-id" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('ConcatenatedProperty')" name="apiRequestPath" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('api.ut.userId')" name="apiUserId" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="fn:concat(get-property('Http_Method'), get-property('REST_API_CONTEXT'), get-property('API_ELECTED_RESOURCE'))" name="apiContext" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('api.ut.application.name')" name="apiAppName" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    </log>
+    <log level="custom">
+        <property name="apiEvent" value="AFTERCUSTVLD"/>
+        <property expression="get-property('apiMessageUUID')" name="apiMessageID" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('Uuid')" name="apiClientUUID" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('SYSTEM_TIME')" name="apiTimestamp" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="fn:concat('$ctx:target_endpoint//Organization[@idpfirm=', get-property('quote'), $ctx:firmName, get-property('quote'), ']/node()[@ctx=', get-property('quote'), $ctx:REST_API_CONTEXT, get-property('quote'), ']/text()')" name="sep_xpath_log1"/>
+    </log>
+    <property expression="fn:concat('$ctx:target_endpoint//Organization[@idpfirm=', get-property('quote'), $ctx:firmName, get-property('quote'), ']/node()[@ctx=', get-property('quote'), $ctx:REST_API_CONTEXT, get-property('quote'), ']/text()')" name="sep_xpath" scope="default" type="STRING"/>
+    <property expression="get-property('registry', 'conf:repository/resources/endpoints/als_endpoints.xml')" name="target_endpoint" scope="default" type="OM"/>
+    <property expression="evaluate($ctx:sep_xpath)" name="service-endpoint" scope="default" type="STRING"/>
+    <log level="custom">
+        <property expression="$ctx:Resource_Path" name="Res_Path"/>
+        <property expression="$ctx:REST_API_CONTEXT" name="Res_Ctx"/>
+        <property expression="get-property('sep_xpath')" name="sep_xpath"/>
+        <property expression="get-property('service-endpoint')" name="service-endpoint"/>
+        <property expression="fn:concat($ctx:service-endpoint, $ctx:Resource_Path)" name="To-Header"/>
+    </log>
+    <header expression="fn:concat($ctx:service-endpoint, $ctx:Resource_Path)" name="To" scope="default"/>
+</sequence>
