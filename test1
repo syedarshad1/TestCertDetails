@@ -45,14 +45,14 @@ SELECT
     e.API_NAME,
     e.inSequence,
     e.outSequence,
-    -- in sequence raw content up to 6000 bytes
-    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(ci.reg_content_data, 2000, 1)))    ||
-    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(ci.reg_content_data, 2000, 2001))) ||
-    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(ci.reg_content_data, 2000, 4001))) AS in_seq_raw_content,
-    -- out sequence raw content up to 6000 bytes
-    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(co.reg_content_data, 2000, 1)))    ||
-    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(co.reg_content_data, 2000, 2001))) ||
-    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(co.reg_content_data, 2000, 4001))) AS out_seq_raw_content
+    -- in sequence as 3 separate columns
+    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(ci.reg_content_data, 2000, 1)))    AS in_seq_p1,
+    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(ci.reg_content_data, 2000, 2001))) AS in_seq_p2,
+    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(ci.reg_content_data, 2000, 4001))) AS in_seq_p3,
+    -- out sequence as 3 separate columns
+    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(co.reg_content_data, 2000, 1)))    AS out_seq_p1,
+    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(co.reg_content_data, 2000, 2001))) AS out_seq_p2,
+    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(co.reg_content_data, 2000, 4001))) AS out_seq_p3
 FROM extracted e
 LEFT JOIN coct42_reg.reg_resource ri ON ri.reg_name = e.inSequence  || '.xml'
 LEFT JOIN coct42_reg.reg_content  ci ON ci.reg_content_id = ri.reg_content_id
