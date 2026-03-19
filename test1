@@ -1,13 +1,427 @@
-perfect!, now you are only searchin in reg_path
+-- =============================================================================
+-- WSO2 API Suspension Logic Query
+-- Checks:
+--   1. endpointConfig tag in API XML
+--   2. inSequence / outSequence custom sequence files (customsequences/in|out)
+--   3. Static endpoint XML files referenced by those sequences
+--   4. Per-API sequences stored under API path:
+--        .../apis/{uuid}/{version}/in    (any reg_name)
+--        .../apis/{uuid}/{version}/out   (any reg_name)
+--        .../apis/{uuid}/{version}/fault (any reg_name)
+-- Flags dynamic endpoints for manual review
+-- =============================================================================
 
-/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/1
-
-I also want you to search 
-
-/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/1/in and reg_name can be anything
-/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/1/out and reg_name can be anything
-/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/1/fault and reg_name can be anything
-
-api_uuid logic, latest numeric number logic and all other logic remains same
-
-once you find reg_name, here also we need to search for suspend keyword in reg_content table, aginst the reg_content_data (which is again blob), just the same logic, but adding another 3 reg_path_value
+WITH api_content AS (
+    SELECT 
+        a.API_NAME,
+        a.CONTEXT,
+        a.ORGANIZATION,
+        a.API_UUID,
+        r.reg_name,
+        r.reg_content_id,
+        p.reg_path_value,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS content_p1,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS content_p2,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS content_p3
+    FROM 
+        COCT42_AM.AM_API a
+        JOIN coct42_reg.reg_path p
+            ON p.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
+        JOIN coct42_reg.reg_resource r
+            ON r.reg_path_id = p.reg_path_id
+            AND r.reg_name = 'api'
+            AND p.reg_path_value = (
+                SELECT p2.reg_path_value
+                FROM coct42_reg.reg_path p2
+                JOIN coct42_reg.reg_resource r2
+                    ON r2.reg_path_id = p2.reg_path_id
+                    AND r2.reg_name = 'api'
+                WHERE p2.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
+                ORDER BY TO_NUMBER(REGEXP_SUBSTR(p2.reg_path_value, '\d+$')) DESC
+                FETCH FIRST 1 ROW ONLY
+            )
+        JOIN coct42_reg.reg_content c ON c.reg_content_id = r.reg_content_id
+    WHERE a.API_UUID = 'c6f3df68-f5da-4d89-979e-f163db878f0a'  -- << CHANGE API_UUID HERE
+),
+-- -----------------------------------------------------------------------
+-- Extract endpointConfig, inSequence, outSequence tag values from API XML
+-- -----------------------------------------------------------------------
+extracted AS (
+    SELECT
+        API_NAME, CONTEXT, ORGANIZATION, API_UUID,
+        reg_name, reg_content_id, reg_path_value,
+        content_p1, content_p2, content_p3,
+        COALESCE(
+            REGEXP_SUBSTR(content_p1 || content_p2, '<endpointConfig>(.*?)</endpointConfig>', 1, 1, 'n', 1),
+            REGEXP_SUBSTR(content_p2 || content_p3, '<endpointConfig>(.*?)</endpointConfig>', 1, 1, 'n', 1)
+        ) AS EndpointConfig,
+        COALESCE(
+            REGEXP_SUBSTR(content_p1 || content_p2, '<inSequence>(.*?)</inSequence>',   1, 1, 'n', 1),
+            REGEXP_SUBSTR(content_p2 || content_p3, '<inSequence>(.*?)</inSequence>',   1, 1, 'n', 1)
+        ) AS inSequence,
+        COALESCE(
+            REGEXP_SUBSTR(content_p1 || content_p2, '<outSequence>(.*?)</outSequence>', 1, 1, 'n', 1),
+            REGEXP_SUBSTR(content_p2 || content_p3, '<outSequence>(.*?)</outSequence>', 1, 1, 'n', 1)
+        ) AS outSequence
+    FROM api_content
+),
+-- -----------------------------------------------------------------------
+-- Read inSequence XML file content from customsequences/in
+-- -----------------------------------------------------------------------
+in_seq_content AS (
+    SELECT 
+        r.reg_name,
+        r.reg_content_id,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS seq_p1,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS seq_p2,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS seq_p3
+    FROM coct42_reg.reg_resource r
+    JOIN coct42_reg.reg_path p    ON r.reg_path_id = p.reg_path_id
+    JOIN coct42_reg.reg_content c ON c.reg_content_id = r.reg_content_id
+    WHERE p.reg_path_value = '/_system/governance/apimgt/customsequences/in'
+      AND r.reg_media_type  = 'application/vnd.wso2.sequence'
+),
+-- -----------------------------------------------------------------------
+-- Read outSequence XML file content from customsequences/out
+-- -----------------------------------------------------------------------
+out_seq_content AS (
+    SELECT 
+        r.reg_name,
+        r.reg_content_id,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS seq_p1,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS seq_p2,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS seq_p3
+    FROM coct42_reg.reg_resource r
+    JOIN coct42_reg.reg_path p    ON r.reg_path_id = p.reg_path_id
+    JOIN coct42_reg.reg_content c ON c.reg_content_id = r.reg_content_id
+    WHERE p.reg_path_value = '/_system/governance/apimgt/customsequences/out'
+      AND r.reg_media_type  = 'application/vnd.wso2.sequence'
+),
+-- -----------------------------------------------------------------------
+-- Per-API /in sequences:
+--   /_system/governance/apimgt/applicationdata/apis/{uuid}/{latest_version}/in
+--   reg_name can be anything - search ALL files under that path
+-- -----------------------------------------------------------------------
+api_in_seq AS (
+    SELECT
+        r.reg_name,
+        r.reg_content_id,
+        p.reg_path_value,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS seq_p1,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS seq_p2,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS seq_p3
+    FROM coct42_reg.reg_resource r
+    JOIN coct42_reg.reg_path p    ON r.reg_path_id = p.reg_path_id
+    JOIN coct42_reg.reg_content c ON c.reg_content_id = r.reg_content_id
+    WHERE p.reg_path_value LIKE
+          '/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/%/in'
+      -- Latest version only
+      AND TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value, '/(\d+)/in$', 1, 1, 'i', 1)) = (
+            SELECT MAX(TO_NUMBER(REGEXP_SUBSTR(p2.reg_path_value, '\d+$')))
+            FROM coct42_reg.reg_path p2
+            JOIN coct42_reg.reg_resource r2 ON r2.reg_path_id = p2.reg_path_id
+                AND r2.reg_name = 'api'
+            WHERE p2.reg_path_value LIKE
+                  '%/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/%'
+        )
+),
+-- -----------------------------------------------------------------------
+-- Per-API /out sequences
+-- -----------------------------------------------------------------------
+api_out_seq AS (
+    SELECT
+        r.reg_name,
+        r.reg_content_id,
+        p.reg_path_value,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS seq_p1,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS seq_p2,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS seq_p3
+    FROM coct42_reg.reg_resource r
+    JOIN coct42_reg.reg_path p    ON r.reg_path_id = p.reg_path_id
+    JOIN coct42_reg.reg_content c ON c.reg_content_id = r.reg_content_id
+    WHERE p.reg_path_value LIKE
+          '/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/%/out'
+      AND TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value, '/(\d+)/out$', 1, 1, 'i', 1)) = (
+            SELECT MAX(TO_NUMBER(REGEXP_SUBSTR(p2.reg_path_value, '\d+$')))
+            FROM coct42_reg.reg_path p2
+            JOIN coct42_reg.reg_resource r2 ON r2.reg_path_id = p2.reg_path_id
+                AND r2.reg_name = 'api'
+            WHERE p2.reg_path_value LIKE
+                  '%/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/%'
+        )
+),
+-- -----------------------------------------------------------------------
+-- Per-API /fault sequences
+-- -----------------------------------------------------------------------
+api_fault_seq AS (
+    SELECT
+        r.reg_name,
+        r.reg_content_id,
+        p.reg_path_value,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS seq_p1,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS seq_p2,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS seq_p3
+    FROM coct42_reg.reg_resource r
+    JOIN coct42_reg.reg_path p    ON r.reg_path_id = p.reg_path_id
+    JOIN coct42_reg.reg_content c ON c.reg_content_id = r.reg_content_id
+    WHERE p.reg_path_value LIKE
+          '/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/%/fault'
+      AND TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value, '/(\d+)/fault$', 1, 1, 'i', 1)) = (
+            SELECT MAX(TO_NUMBER(REGEXP_SUBSTR(p2.reg_path_value, '\d+$')))
+            FROM coct42_reg.reg_path p2
+            JOIN coct42_reg.reg_resource r2 ON r2.reg_path_id = p2.reg_path_id
+                AND r2.reg_name = 'api'
+            WHERE p2.reg_path_value LIKE
+                  '%/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/%'
+        )
+),
+-- -----------------------------------------------------------------------
+-- Aggregate per-API in/out/fault suspend check across ALL files per path
+-- has_suspend = 1 if ANY file under that path contains 'suspend'
+-- suspend_files = comma list of filenames where suspend was found
+-- -----------------------------------------------------------------------
+api_in_suspend AS (
+    SELECT
+        MAX(CASE WHEN REGEXP_LIKE(seq_p1||seq_p2,'suspend','i')
+                   OR REGEXP_LIKE(seq_p2||seq_p3,'suspend','i')
+                 THEN 1 ELSE 0 END) AS has_suspend,
+        LISTAGG(
+            CASE WHEN REGEXP_LIKE(seq_p1||seq_p2,'suspend','i')
+                   OR REGEXP_LIKE(seq_p2||seq_p3,'suspend','i')
+                 THEN reg_name END, ', '
+        ) WITHIN GROUP (ORDER BY reg_name) AS suspend_files
+    FROM api_in_seq
+),
+api_out_suspend AS (
+    SELECT
+        MAX(CASE WHEN REGEXP_LIKE(seq_p1||seq_p2,'suspend','i')
+                   OR REGEXP_LIKE(seq_p2||seq_p3,'suspend','i')
+                 THEN 1 ELSE 0 END) AS has_suspend,
+        LISTAGG(
+            CASE WHEN REGEXP_LIKE(seq_p1||seq_p2,'suspend','i')
+                   OR REGEXP_LIKE(seq_p2||seq_p3,'suspend','i')
+                 THEN reg_name END, ', '
+        ) WITHIN GROUP (ORDER BY reg_name) AS suspend_files
+    FROM api_out_seq
+),
+api_fault_suspend AS (
+    SELECT
+        MAX(CASE WHEN REGEXP_LIKE(seq_p1||seq_p2,'suspend','i')
+                   OR REGEXP_LIKE(seq_p2||seq_p3,'suspend','i')
+                 THEN 1 ELSE 0 END) AS has_suspend,
+        LISTAGG(
+            CASE WHEN REGEXP_LIKE(seq_p1||seq_p2,'suspend','i')
+                   OR REGEXP_LIKE(seq_p2||seq_p3,'suspend','i')
+                 THEN reg_name END, ', '
+        ) WITHIN GROUP (ORDER BY reg_name) AS suspend_files
+    FROM api_fault_seq
+),
+-- -----------------------------------------------------------------------
+-- Detect static vs dynamic endpoint file reference in inSequence
+-- STATIC  : conf:repository/resources/endpoints/als_endpoints.xml
+-- DYNAMIC : fn:concat wraps the conf: path itself (filename is runtime)
+-- KEY-EXP : <endpoint key-expression="..."/>
+-- -----------------------------------------------------------------------
+in_seq_static_ref AS (
+    SELECT
+        i.reg_name AS seq_name,
+        REGEXP_SUBSTR(
+            i.seq_p1 || i.seq_p2,
+            'conf:[^'']*?/endpoints/([^'']+\.xml)',
+            1, 1, 'n', 1
+        ) AS endpoint_filename,
+        CASE 
+            WHEN REGEXP_LIKE(i.seq_p1 || i.seq_p2, 'fn:concat\([^)]*conf:[^)]*endpoint', 'i') THEN 'Y'
+            WHEN REGEXP_LIKE(i.seq_p2 || i.seq_p3, 'fn:concat\([^)]*conf:[^)]*endpoint', 'i') THEN 'Y'
+            ELSE 'N'
+        END AS is_dynamic,
+        CASE 
+            WHEN REGEXP_LIKE(i.seq_p1 || i.seq_p2, 'key-expression', 'i') THEN 'Y'
+            WHEN REGEXP_LIKE(i.seq_p2 || i.seq_p3, 'key-expression', 'i') THEN 'Y'
+            ELSE 'N'
+        END AS is_key_expression
+    FROM in_seq_content i
+),
+-- -----------------------------------------------------------------------
+-- Detect static vs dynamic endpoint file reference in outSequence
+-- -----------------------------------------------------------------------
+out_seq_static_ref AS (
+    SELECT
+        o.reg_name AS seq_name,
+        REGEXP_SUBSTR(
+            o.seq_p1 || o.seq_p2,
+            'conf:[^'']*?/endpoints/([^'']+\.xml)',
+            1, 1, 'n', 1
+        ) AS endpoint_filename,
+        CASE 
+            WHEN REGEXP_LIKE(o.seq_p1 || o.seq_p2, 'fn:concat\([^)]*conf:[^)]*endpoint', 'i') THEN 'Y'
+            WHEN REGEXP_LIKE(o.seq_p2 || o.seq_p3, 'fn:concat\([^)]*conf:[^)]*endpoint', 'i') THEN 'Y'
+            ELSE 'N'
+        END AS is_dynamic,
+        CASE 
+            WHEN REGEXP_LIKE(o.seq_p1 || o.seq_p2, 'key-expression', 'i') THEN 'Y'
+            WHEN REGEXP_LIKE(o.seq_p2 || o.seq_p3, 'key-expression', 'i') THEN 'Y'
+            ELSE 'N'
+        END AS is_key_expression
+    FROM out_seq_content o
+),
+-- -----------------------------------------------------------------------
+-- Read static endpoint XML file referenced by inSequence
+-- -----------------------------------------------------------------------
+in_endpoint_content AS (
+    SELECT
+        iref.seq_name,
+        iref.endpoint_filename,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS ep_p1,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS ep_p2,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS ep_p3
+    FROM in_seq_static_ref iref
+    JOIN coct42_reg.reg_resource r  ON r.reg_name = iref.endpoint_filename
+    JOIN coct42_reg.reg_path p      ON r.reg_path_id = p.reg_path_id
+                                   AND p.reg_path_value LIKE '%/repository/resources/endpoints%'
+    JOIN coct42_reg.reg_content c   ON c.reg_content_id = r.reg_content_id
+    WHERE iref.endpoint_filename IS NOT NULL
+      AND iref.is_dynamic = 'N'
+),
+-- -----------------------------------------------------------------------
+-- Read static endpoint XML file referenced by outSequence
+-- -----------------------------------------------------------------------
+out_endpoint_content AS (
+    SELECT
+        oref.seq_name,
+        oref.endpoint_filename,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS ep_p1,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS ep_p2,
+        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS ep_p3
+    FROM out_seq_static_ref oref
+    JOIN coct42_reg.reg_resource r  ON r.reg_name = oref.endpoint_filename
+    JOIN coct42_reg.reg_path p      ON r.reg_path_id = p.reg_path_id
+                                   AND p.reg_path_value LIKE '%/repository/resources/endpoints%'
+    JOIN coct42_reg.reg_content c   ON c.reg_content_id = r.reg_content_id
+    WHERE oref.endpoint_filename IS NOT NULL
+      AND oref.is_dynamic = 'N'
+)
+-- =============================================================================
+-- FINAL SELECT
+-- =============================================================================
+SELECT
+    e.API_NAME,
+    e.CONTEXT,
+    e.ORGANIZATION,
+    e.API_UUID,
+    e.reg_name,
+    -- -------------------------------------------------------------------
+    -- SuspensionLogic
+    -- Priority: EndpointConfig > customseq in/out > static ep file >
+    --           per-api in/out/fault > dynamic flag > default
+    -- -------------------------------------------------------------------
+    CASE
+        WHEN REGEXP_LIKE(e.EndpointConfig,          'suspend', 'i') THEN 'Suspension Enabled'
+        WHEN REGEXP_LIKE(i.seq_p1 || i.seq_p2,      'suspend', 'i') THEN 'Suspension Enabled'
+        WHEN REGEXP_LIKE(i.seq_p2 || i.seq_p3,      'suspend', 'i') THEN 'Suspension Enabled'
+        WHEN REGEXP_LIKE(o.seq_p1 || o.seq_p2,      'suspend', 'i') THEN 'Suspension Enabled'
+        WHEN REGEXP_LIKE(o.seq_p2 || o.seq_p3,      'suspend', 'i') THEN 'Suspension Enabled'
+        WHEN REGEXP_LIKE(ie.ep_p1 || ie.ep_p2,      'suspend', 'i') THEN 'Suspension Enabled'
+        WHEN REGEXP_LIKE(ie.ep_p2 || ie.ep_p3,      'suspend', 'i') THEN 'Suspension Enabled'
+        WHEN REGEXP_LIKE(oe.ep_p1 || oe.ep_p2,      'suspend', 'i') THEN 'Suspension Enabled'
+        WHEN REGEXP_LIKE(oe.ep_p2 || oe.ep_p3,      'suspend', 'i') THEN 'Suspension Enabled'
+        WHEN ais.has_suspend = 1                                     THEN 'Suspension Enabled'
+        WHEN aos.has_suspend = 1                                     THEN 'Suspension Enabled'
+        WHEN afs.has_suspend = 1                                     THEN 'Suspension Enabled'
+        WHEN isr.is_dynamic        = 'Y'                            THEN 'Manual Check Required'
+        WHEN isr.is_key_expression = 'Y'                            THEN 'Manual Check Required'
+        WHEN osr.is_dynamic        = 'Y'                            THEN 'Manual Check Required'
+        WHEN osr.is_key_expression = 'Y'                            THEN 'Manual Check Required'
+        ELSE 'Default Suspension'
+    END AS SuspensionLogic,
+    -- -------------------------------------------------------------------
+    -- SuspensionSource: exactly where suspend was found
+    -- -------------------------------------------------------------------
+    CASE
+        -- Found in EndpointConfig
+        WHEN REGEXP_LIKE(e.EndpointConfig, 'suspend', 'i')
+            THEN 'EndpointConfig'
+            || CASE WHEN REGEXP_LIKE(i.seq_p1||i.seq_p2,'suspend','i') OR REGEXP_LIKE(i.seq_p2||i.seq_p3,'suspend','i') THEN ', ' || e.inSequence  ELSE '' END
+            || CASE WHEN REGEXP_LIKE(o.seq_p1||o.seq_p2,'suspend','i') OR REGEXP_LIKE(o.seq_p2||o.seq_p3,'suspend','i') THEN ', ' || e.outSequence ELSE '' END
+            || CASE WHEN REGEXP_LIKE(ie.ep_p1||ie.ep_p2,'suspend','i') OR REGEXP_LIKE(ie.ep_p2||ie.ep_p3,'suspend','i') THEN ', ' || ie.endpoint_filename ELSE '' END
+            || CASE WHEN REGEXP_LIKE(oe.ep_p1||oe.ep_p2,'suspend','i') OR REGEXP_LIKE(oe.ep_p2||oe.ep_p3,'suspend','i') THEN ', ' || oe.endpoint_filename ELSE '' END
+            || CASE WHEN ais.has_suspend = 1 THEN ', API /in: '    || ais.suspend_files ELSE '' END
+            || CASE WHEN aos.has_suspend = 1 THEN ', API /out: '   || aos.suspend_files ELSE '' END
+            || CASE WHEN afs.has_suspend = 1 THEN ', API /fault: ' || afs.suspend_files ELSE '' END
+        -- Found in custom inSequence
+        WHEN REGEXP_LIKE(i.seq_p1||i.seq_p2,'suspend','i') OR REGEXP_LIKE(i.seq_p2||i.seq_p3,'suspend','i')
+            THEN e.inSequence
+            || CASE WHEN REGEXP_LIKE(o.seq_p1||o.seq_p2,'suspend','i') OR REGEXP_LIKE(o.seq_p2||o.seq_p3,'suspend','i') THEN ', ' || e.outSequence ELSE '' END
+            || CASE WHEN REGEXP_LIKE(ie.ep_p1||ie.ep_p2,'suspend','i') OR REGEXP_LIKE(ie.ep_p2||ie.ep_p3,'suspend','i') THEN ', ' || ie.endpoint_filename ELSE '' END
+            || CASE WHEN REGEXP_LIKE(oe.ep_p1||oe.ep_p2,'suspend','i') OR REGEXP_LIKE(oe.ep_p2||oe.ep_p3,'suspend','i') THEN ', ' || oe.endpoint_filename ELSE '' END
+            || CASE WHEN ais.has_suspend = 1 THEN ', API /in: '    || ais.suspend_files ELSE '' END
+            || CASE WHEN aos.has_suspend = 1 THEN ', API /out: '   || aos.suspend_files ELSE '' END
+            || CASE WHEN afs.has_suspend = 1 THEN ', API /fault: ' || afs.suspend_files ELSE '' END
+        -- Found in custom outSequence
+        WHEN REGEXP_LIKE(o.seq_p1||o.seq_p2,'suspend','i') OR REGEXP_LIKE(o.seq_p2||o.seq_p3,'suspend','i')
+            THEN e.outSequence
+            || CASE WHEN REGEXP_LIKE(ie.ep_p1||ie.ep_p2,'suspend','i') OR REGEXP_LIKE(ie.ep_p2||ie.ep_p3,'suspend','i') THEN ', ' || ie.endpoint_filename ELSE '' END
+            || CASE WHEN REGEXP_LIKE(oe.ep_p1||oe.ep_p2,'suspend','i') OR REGEXP_LIKE(oe.ep_p2||oe.ep_p3,'suspend','i') THEN ', ' || oe.endpoint_filename ELSE '' END
+            || CASE WHEN ais.has_suspend = 1 THEN ', API /in: '    || ais.suspend_files ELSE '' END
+            || CASE WHEN aos.has_suspend = 1 THEN ', API /out: '   || aos.suspend_files ELSE '' END
+            || CASE WHEN afs.has_suspend = 1 THEN ', API /fault: ' || afs.suspend_files ELSE '' END
+        -- Found in static endpoint file from inSequence
+        WHEN REGEXP_LIKE(ie.ep_p1||ie.ep_p2,'suspend','i') OR REGEXP_LIKE(ie.ep_p2||ie.ep_p3,'suspend','i')
+            THEN ie.endpoint_filename
+            || CASE WHEN REGEXP_LIKE(oe.ep_p1||oe.ep_p2,'suspend','i') OR REGEXP_LIKE(oe.ep_p2||oe.ep_p3,'suspend','i') THEN ', ' || oe.endpoint_filename ELSE '' END
+            || CASE WHEN ais.has_suspend = 1 THEN ', API /in: '    || ais.suspend_files ELSE '' END
+            || CASE WHEN aos.has_suspend = 1 THEN ', API /out: '   || aos.suspend_files ELSE '' END
+            || CASE WHEN afs.has_suspend = 1 THEN ', API /fault: ' || afs.suspend_files ELSE '' END
+        -- Found in static endpoint file from outSequence
+        WHEN REGEXP_LIKE(oe.ep_p1||oe.ep_p2,'suspend','i') OR REGEXP_LIKE(oe.ep_p2||oe.ep_p3,'suspend','i')
+            THEN oe.endpoint_filename
+            || CASE WHEN ais.has_suspend = 1 THEN ', API /in: '    || ais.suspend_files ELSE '' END
+            || CASE WHEN aos.has_suspend = 1 THEN ', API /out: '   || aos.suspend_files ELSE '' END
+            || CASE WHEN afs.has_suspend = 1 THEN ', API /fault: ' || afs.suspend_files ELSE '' END
+        -- Found in per-API /in path
+        WHEN ais.has_suspend = 1
+            THEN 'API /in: ' || ais.suspend_files
+            || CASE WHEN aos.has_suspend = 1 THEN ', API /out: '   || aos.suspend_files ELSE '' END
+            || CASE WHEN afs.has_suspend = 1 THEN ', API /fault: ' || afs.suspend_files ELSE '' END
+        -- Found in per-API /out path
+        WHEN aos.has_suspend = 1
+            THEN 'API /out: ' || aos.suspend_files
+            || CASE WHEN afs.has_suspend = 1 THEN ', API /fault: ' || afs.suspend_files ELSE '' END
+        -- Found in per-API /fault path
+        WHEN afs.has_suspend = 1
+            THEN 'API /fault: ' || afs.suspend_files
+        -- Dynamic: fn:concat builds conf: path at runtime
+        WHEN isr.is_dynamic = 'Y'
+            THEN 'Dynamic endpoint in ' || e.inSequence || ' (fn:concat path) - Manual Check Required'
+        WHEN isr.is_key_expression = 'Y'
+            THEN 'Runtime key-expression endpoint in ' || e.inSequence || ' - Manual Check Required'
+        WHEN osr.is_dynamic = 'Y'
+            THEN 'Dynamic endpoint in ' || e.outSequence || ' (fn:concat path) - Manual Check Required'
+        WHEN osr.is_key_expression = 'Y'
+            THEN 'Runtime key-expression endpoint in ' || e.outSequence || ' - Manual Check Required'
+        ELSE 'None'
+    END AS SuspensionSource,
+    e.reg_content_id,
+    e.reg_path_value,
+    e.EndpointConfig,
+    e.inSequence,
+    e.outSequence,
+    -- Bonus columns: shows which files under per-API paths had suspend
+    ais.suspend_files  AS api_in_suspend_files,
+    aos.suspend_files  AS api_out_suspend_files,
+    afs.suspend_files  AS api_fault_suspend_files
+FROM extracted e
+-- Custom global sequence file content
+LEFT JOIN in_seq_content       i   ON i.reg_name   = e.inSequence  || '.xml'
+LEFT JOIN out_seq_content      o   ON o.reg_name   = e.outSequence || '.xml'
+-- Sequence endpoint detection (static vs dynamic)
+LEFT JOIN in_seq_static_ref    isr ON isr.seq_name = e.inSequence  || '.xml'
+LEFT JOIN out_seq_static_ref   osr ON osr.seq_name = e.outSequence || '.xml'
+-- Static endpoint file content
+LEFT JOIN in_endpoint_content  ie  ON ie.seq_name  = e.inSequence  || '.xml'
+LEFT JOIN out_endpoint_content oe  ON oe.seq_name  = e.outSequence || '.xml'
+-- Per-API in/out/fault suspend aggregates (single row each, safe cross join)
+LEFT JOIN api_in_suspend    ais ON 1=1
+LEFT JOIN api_out_suspend   aos ON 1=1
+LEFT JOIN api_fault_suspend afs ON 1=1
+;
