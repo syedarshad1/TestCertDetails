@@ -1,1 +1,22 @@
-fd1b5417-eeea-4fef-b2df-c36affe0913e	AlertServices		<metadata xmlns="http://www.wso2.org/governance/metadata"><overview><redirectURL></redirectURL><environments></environments><apiExternalProductionEndpoint></apiExternalProductionEndpoint><authorizationHeader></authorizationHeader><type>HTTP</type><productionTps></productionTps><enableSchemaValidatio	No suspend in api blob
+-- Step 1: just print the raw api blob for AlertServices
+SELECT
+  a.API_NAME,
+  a.API_UUID,
+  r.reg_content_id,
+  p.reg_path_value,
+  REPLACE(REPLACE(REPLACE(
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 3000, 1)),
+  CHR(10),' '),CHR(13),''),CHR(9),' ') AS api_blob_chunk1
+FROM COCT42_AM.AM_API a
+JOIN coct42_reg.reg_resource r
+  ON r.reg_name = 'api'
+JOIN coct42_reg.reg_path p
+  ON p.reg_path_id = r.reg_path_id
+  AND p.reg_path_value LIKE
+      '/_system/governance/apimgt/applicationdata/apis/fd1b5417-eeea-4fef-b2df-c36affe0913e/%'
+JOIN coct42_reg.reg_content c
+  ON c.reg_content_id = r.reg_content_id
+WHERE a.API_UUID = 'fd1b5417-eeea-4fef-b2df-c36affe0913e'
+ORDER BY r.reg_content_id DESC
+FETCH FIRST 1 ROWS ONLY;
