@@ -1,5 +1,123 @@
-<	>	"	7
+WITH reg_apis AS (
+  SELECT
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/([0-9a-fA-F-]{36})/',
+      1, 1, NULL, 1)             AS api_uuid,
+    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+      1, 1, NULL, 1))            AS rev,
+    r.reg_content_id
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  r.reg_name = 'api'
+    AND  p.reg_path_value LIKE
+         '/_system/governance/apimgt/applicationdata/apis/%'
+),
+latest_rev AS (
+  SELECT
+    api_uuid,
+    MAX(rev)                      AS latest_rev,
+    MAX(reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
+  FROM   reg_apis
+  WHERE  api_uuid IS NOT NULL
+  GROUP BY api_uuid
+)
+SELECT COUNT(*) FROM latest_rev;
 
-0
 
-1
+WITH reg_apis AS (
+  SELECT
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/([0-9a-fA-F-]{36})/',
+      1, 1, NULL, 1)             AS api_uuid,
+    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+      1, 1, NULL, 1))            AS rev,
+    r.reg_content_id
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  r.reg_name = 'api'
+    AND  p.reg_path_value LIKE
+         '/_system/governance/apimgt/applicationdata/apis/%'
+),
+latest_rev AS (
+  SELECT
+    api_uuid,
+    MAX(rev)                      AS latest_rev,
+    MAX(reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
+  FROM   reg_apis
+  WHERE  api_uuid IS NOT NULL
+  GROUP BY api_uuid
+),
+api_blob AS (
+  SELECT
+    lr.api_uuid,
+    lr.latest_rev,
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,1)))   ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,2001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,4001))) AS clob_txt
+  FROM   latest_rev lr
+  LEFT JOIN coct42_reg.reg_content c
+    ON   c.reg_content_id = lr.reg_content_id
+)
+SELECT COUNT(*) FROM api_blob;
+
+
+WITH reg_apis AS (
+  SELECT
+    REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/([0-9a-fA-F-]{36})/',
+      1, 1, NULL, 1)             AS api_uuid,
+    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
+      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
+      1, 1, NULL, 1))            AS rev,
+    r.reg_content_id
+  FROM   coct42_reg.reg_resource r
+  JOIN   coct42_reg.reg_path p
+    ON   p.reg_path_id = r.reg_path_id
+  WHERE  r.reg_name = 'api'
+    AND  p.reg_path_value LIKE
+         '/_system/governance/apimgt/applicationdata/apis/%'
+),
+latest_rev AS (
+  SELECT
+    api_uuid,
+    MAX(rev)                      AS latest_rev,
+    MAX(reg_content_id) KEEP
+      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
+  FROM   reg_apis
+  WHERE  api_uuid IS NOT NULL
+  GROUP BY api_uuid
+),
+api_blob AS (
+  SELECT
+    lr.api_uuid,
+    lr.latest_rev,
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,1)))   ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,2001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,4001))) AS clob_txt
+  FROM   latest_rev lr
+  LEFT JOIN coct42_reg.reg_content c
+    ON   c.reg_content_id = lr.reg_content_id
+),
+api_analysis AS (
+  SELECT
+    api_uuid,
+    CASE
+      WHEN DBMS_LOB.INSTR(UPPER(clob_txt),'SUSPEND')>0
+        THEN 1 ELSE 0
+    END                           AS api_has_suspend,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,
+             'suspendDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
+        OR   DBMS_LOB.INSTR(clob_txt,
+               'suspendDuration'||CHR(62)||'0'||CHR(60))>0
+        THEN 1 ELSE 0
+    END                           AS api_suspend_dur_zero
+  FROM   api_blob
+)
+SELECT COUNT(*) FROM api_analysis;
