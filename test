@@ -26,3 +26,5 @@ reg_path like "/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d8
  reg_name = "aaa_als_seq_in.xml" and search for suspend keyword in "reg_content_data" which is blob aginst each "reg_content_id"
 
 14071087	822bb236-3b62-4a86-88aa-c4c8521c9d52	aaa_als_seq_in.xml	application/vnd.wso2.sequence	/_system/governance/apimgt/customsequences/in	06-MAY-25 02.46.31.225000000 AM
+
+        <endpoint key="conf:/gsapi/endpoints/gs_als_loan_tran_reversal_REST.xml"/>
