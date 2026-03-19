@@ -1,18 +1,1 @@
--- Search BLOB directly using UTL_RAW
-SELECT
-  CASE
-    WHEN DBMS_LOB.INSTR(
-           c.reg_content_data,
-           UTL_RAW.CAST_TO_RAW('suspend')) > 0
-      THEN 'Found suspend'
-    ELSE 'Not found'
-  END AS suspend_found,
-  CASE
-    WHEN DBMS_LOB.INSTR(
-           c.reg_content_data,
-           UTL_RAW.CAST_TO_RAW('suspendDuration')) > 0
-      THEN 'Found suspendDuration'
-    ELSE 'Not found'
-  END AS suspend_dur_found
-FROM coct42_reg.reg_content c
-WHERE c.reg_content_id = 18560005;
+Found suspend	Found suspendDuration
