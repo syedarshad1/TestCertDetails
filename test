@@ -1,56 +1,28 @@
-14071047	4ea5c5ad-c9fb-4c46-8b7a-b93ac6c9b17b	als_endpoints.xml	application/xml	/_system/config/repository/resources/endpoints	06-MAY-25 02.46.30.287000000 AM
+so everything should be dynamic.
 
-als_endpoints.xml
+1 - First using API_UUID and search for suspend keyword in "reg_content_data" which is blob (between <endpointConfig></endpointConfig>) aginst each "reg_content_id"
 
-<endpoints>
-  	<!--   BATEST  CASPH@05   -->
-	<Organization idpfirm="aaabatest">
-		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.11:3303/REST</Loan-Account-Inquiries>
-	</Organization>
-	<!--   End BATEST   -->
-	<!--   DEV  CASPH@05   -->
-	<Organization idpfirm="aaadev">
-		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.11:3303/REST</Loan-Account-Inquiries>
-	</Organization>
-	<!--   End DEV   -->
-    <!--   HTS  CASPL@00   -->
-    <Organization idpfirm="aaahts">
-		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.11:3436/REST</Loan-Account-Inquiries>
-	</Organization>
-    <!--   End HTS   -->
-    <!--   MIG  CASPU@01/CASPU@02   -->
-    <Organization idpfirm="aaamig">
-		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.21:3439/REST</Loan-Account-Inquiries>
-	</Organization>
-    <!--   End MIG   -->
-	<!--   QA   CASPH@05   -->
-	<Organization idpfirm="aaaqa">
-		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.11:3303/REST</Loan-Account-Inquiries>
-	</Organization>
-	<!--   End QA   -->
-  	<!--   SIT  CASPS@01   -->
-	<Organization idpfirm="aaasit">
-		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.21:3316/REST</Loan-Account-Inquiries>
-	</Organization>
-	<!--   End SIT   -->	
-  	<!--   SPE  CASPH@05   -->
-	<Organization idpfirm="aaabank-spe">
-		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.11:3303/REST</Loan-Account-Inquiries>
-	</Organization>
-	<!--   End SPE   -->
-  	<!--   UAT  CASPO@01  -->
-	<Organization idpfirm="aaabank-uat">
-		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.21:3441/REST</Loan-Account-Inquiries>
-	</Organization>
-	<!--   End UAT  -->
-	<!--   PROD  CASPP@01/CASPP@02   -->
-	<Organization idpfirm="aaabank">
-		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.25:3440/REST</Loan-Account-Inquiries>
-	</Organization>
-	<!--   End PROD   -->
-  	<!--   CONVERSION2  CASPO@01/CASPO@02   -->
-	<Organization idpfirm="aaabank-conversion2">
-		<Loan-Account-Inquiries ctx="/t/aaa.com/als/v1">https://204.130.41.21:3441/REST</Loan-Account-Inquiries>
-	</Organization>
-	<!--   End CONVERSION2  -->
-</endpoints>
+reg_name like "api" and 
+reg_path like "/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/1" (should be latest numeric number)
+
+example(reg_content_data content):
+<endpointConfig>{production_endpoints:{url:default},sandbox_endpoints:{url:default},endpoint_type:default}</endpointConfig>
+
+example db query:
+15719621	5d83c786-bf54-47e8-b2bf-993cf49363f4	api	application/vnd.wso2-api+xml	/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/1	08-AUG-25 03.20.12.934000000 PM
+
+2 - Looks for any reg_name and 
+
+reg_path like "/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/1/in" ('1' -should be latest numeric number)
+reg_path like "/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/1/out" ('1' -should be latest numeric number)
+reg_path like "/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/1/fault" ('1' -should be latest numeric number)
+
+3 - If nothing found here look for insequence reg_name, which is in reg_name like "api" and 
+reg_path like "/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/1" (should be latest numeric number)
+
+	example:
+	<inSequence>aaa_als_seq_in</inSequence>
+ once you get aaa_als_seq_in, search in 
+ reg_name = "aaa_als_seq_in.xml" and search for suspend keyword in "reg_content_data" which is blob aginst each "reg_content_id"
+
+14071087	822bb236-3b62-4a86-88aa-c4c8521c9d52	aaa_als_seq_in.xml	application/vnd.wso2.sequence	/_system/governance/apimgt/customsequences/in	06-MAY-25 02.46.31.225000000 AM
