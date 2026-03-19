@@ -1,31 +1,41 @@
 SELECT
-  'EndpointConfig'               AS section,
-  utl_raw.cast_to_varchar2(
-    dbms_lob.substr(c.reg_content_data,
-      -- length from endpointConfig to /endpointConfig
-      DBMS_LOB.INSTR(c.reg_content_data,
-        UTL_RAW.CAST_TO_RAW('/endpointConfig')) -
-      DBMS_LOB.INSTR(c.reg_content_data,
-        UTL_RAW.CAST_TO_RAW('endpointConfig')) + 17,
-      -- start at endpointConfig position
-      DBMS_LOB.INSTR(c.reg_content_data,
-        UTL_RAW.CAST_TO_RAW('endpointConfig'))))
-                                 AS content
-FROM coct42_reg.reg_content c
-WHERE c.reg_content_id = 15781073
-UNION ALL
-SELECT
-  'SequenceFileName',
-  utl_raw.cast_to_varchar2(
-    dbms_lob.substr(c.reg_content_data,
-      -- length from inSequence to /inSequence
-      DBMS_LOB.INSTR(c.reg_content_data,
-        UTL_RAW.CAST_TO_RAW('/inSequence')) -
-      DBMS_LOB.INSTR(c.reg_content_data,
-        UTL_RAW.CAST_TO_RAW('inSequence')) + 12,
-      -- start at inSequence position
-      DBMS_LOB.INSTR(c.reg_content_data,
-        UTL_RAW.CAST_TO_RAW('inSequence'))))
-                                 AS content
-FROM coct42_reg.reg_content c
-WHERE c.reg_content_id = 15781073;
+  a.API_NAME,
+  a.API_VERSION,
+  a.ORGANIZATION                 AS TENANT,
+  -- endpointConfig block
+  REPLACE(REPLACE(REPLACE(
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 500, 2671)),
+  CHR(10),''),CHR(13),''),CHR(9),'')
+                                 AS ENDPOINT_CONFIG,
+  -- value between <inSequence>...</inSequence>
+  SUBSTR(
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 100, 2995)),
+    INSTR(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 100, 2995)),
+      '<inSequence>') + 12,
+    INSTR(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 100, 2995)),
+      '</inSequence>') -
+    INSTR(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 100, 2995)),
+      '<inSequence>') - 12
+  )                              AS IN_SEQUENCE_NAME,
+  -- suspend context
+  REPLACE(REPLACE(REPLACE(
+    utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 300, 2700)),
+  CHR(10),''),CHR(13),''),CHR(9),'')
+                                 AS SUSPEND_CONTEXT
+FROM COCT42_AM.AM_API a
+JOIN coct42_reg.reg_resource r
+  ON r.reg_name = 'api'
+JOIN coct42_reg.reg_path p
+  ON p.reg_path_id = r.reg_path_id
+  AND p.reg_path_value LIKE
+      '/_system/governance/apimgt/applicationdata/apis/fd1b5417-eeea-4fef-b2df-c36affe0913e/%'
+JOIN coct42_reg.reg_content c
+  ON c.reg_content_id = r.reg_content_id
+WHERE a.API_UUID = 'fd1b5417-eeea-4fef-b2df-c36affe0913e'
+  AND r.reg_content_id = 15781073;
