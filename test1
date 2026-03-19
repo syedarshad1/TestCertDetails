@@ -1,32 +1,14 @@
-SELECT 
-    a.API_NAME,
-    a.CONTEXT,
-    a.ORGANIZATION,
-    a.API_UUID,
-    r.reg_name,
-    r.reg_content_id,
-    p.reg_path_value,
-    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1))) AS reg_content_part1,
-    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS reg_content_part2,
-    UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS reg_content_part3
-FROM 
-    COCT42_AM.AM_API a
-    JOIN coct42_reg.reg_path p
-        ON p.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
-    JOIN coct42_reg.reg_resource r
-        ON r.reg_path_id = p.reg_path_id
-        AND r.reg_name = 'api'
-        AND p.reg_path_value = (
-            SELECT p2.reg_path_value
-            FROM coct42_reg.reg_path p2
-            JOIN coct42_reg.reg_resource r2
-                ON r2.reg_path_id = p2.reg_path_id
-                AND r2.reg_name = 'api'
-            WHERE p2.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
-            ORDER BY TO_NUMBER(REGEXP_SUBSTR(p2.reg_path_value, '\d+$')) DESC
-            FETCH FIRST 1 ROW ONLY
-        )
-    JOIN coct42_reg.reg_content c
-        ON c.reg_content_id = r.reg_content_id
-WHERE 
-    a.API_UUID = 'fd1b5417-eeea-4fef-b2df-c36affe0913e';
+perfect, now I have what I need, now I want get specific substring from reg_content
+
+1. I want to pull what ever is between this 2 tags <endpointConfig></endpointConfig> as EndpointConfig column
+
+example
+<endpointConfig>{"endpoint_type":"default","sandbox_endpoints":{"config":{"suspendDuration":"0","suspendErrorCode":["-1"],"suspendMaxDuration":"0"},"url":"default"},"production_endpoints":{"config":{"suspendDuration":"0","suspendErrorCode":["-1"],"suspendMaxDuration":"0"},"url":"default"}}</endpointConfig>
+
+2. I want to pull what ever between this 2 tags <inSequence></inSequence> as inSequence
+
+<inSequence></inSequence>
+
+3. I want to pull what ever between this 2 tags <outSequence></outSequence> as outSequence
+
+<inSequence></inSequence>
