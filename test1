@@ -1,226 +1,47 @@
-WITH api_content AS (
-    SELECT 
-        a.API_NAME,
-        a.CONTEXT,
-        a.ORGANIZATION,
-        a.API_UUID,
-        r.reg_name,
-        r.reg_content_id,
-        p.reg_path_value,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS content_p1,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS content_p2,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS content_p3
-    FROM 
-        COCT42_AM.AM_API a
-        JOIN coct42_reg.reg_path p
-            ON p.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
-        JOIN coct42_reg.reg_resource r
-            ON r.reg_path_id = p.reg_path_id
-            AND r.reg_name = 'api'
-            AND p.reg_path_value = (
-                SELECT p2.reg_path_value
-                FROM coct42_reg.reg_path p2
-                JOIN coct42_reg.reg_resource r2
-                    ON r2.reg_path_id = p2.reg_path_id
-                    AND r2.reg_name = 'api'
-                WHERE p2.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
-                ORDER BY TO_NUMBER(REGEXP_SUBSTR(p2.reg_path_value, '\d+$')) DESC
-                FETCH FIRST 1 ROW ONLY
-            )
-        JOIN coct42_reg.reg_content c ON c.reg_content_id = r.reg_content_id
-    WHERE a.API_UUID = 'c6f3df68-f5da-4d89-979e-f163db878f0a'
-),
-extracted AS (
-    SELECT
-        API_NAME, CONTEXT, ORGANIZATION, API_UUID, reg_name, reg_content_id, reg_path_value,
-        content_p1, content_p2, content_p3,
-        COALESCE(
-            REGEXP_SUBSTR(content_p1 || content_p2, '<endpointConfig>(.*?)</endpointConfig>', 1, 1, 'n', 1),
-            REGEXP_SUBSTR(content_p2 || content_p3, '<endpointConfig>(.*?)</endpointConfig>', 1, 1, 'n', 1)
-        ) AS EndpointConfig,
-        COALESCE(
-            REGEXP_SUBSTR(content_p1 || content_p2, '<inSequence>(.*?)</inSequence>',   1, 1, 'n', 1),
-            REGEXP_SUBSTR(content_p2 || content_p3, '<inSequence>(.*?)</inSequence>',   1, 1, 'n', 1)
-        ) AS inSequence,
-        COALESCE(
-            REGEXP_SUBSTR(content_p1 || content_p2, '<outSequence>(.*?)</outSequence>', 1, 1, 'n', 1),
-            REGEXP_SUBSTR(content_p2 || content_p3, '<outSequence>(.*?)</outSequence>', 1, 1, 'n', 1)
-        ) AS outSequence
-    FROM api_content
-),
--- Read inSequence XML chunks
-in_seq_content AS (
-    SELECT 
-        r.reg_name,
-        r.reg_content_id,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS seq_p1,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS seq_p2,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS seq_p3
-    FROM coct42_reg.reg_resource r
-    JOIN coct42_reg.reg_path p    ON r.reg_path_id = p.reg_path_id
-    JOIN coct42_reg.reg_content c ON c.reg_content_id = r.reg_content_id
-    WHERE p.reg_path_value = '/_system/governance/apimgt/customsequences/in'
-      AND r.reg_media_type  = 'application/vnd.wso2.sequence'
-),
--- Read outSequence XML chunks
-out_seq_content AS (
-    SELECT 
-        r.reg_name,
-        r.reg_content_id,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS seq_p1,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS seq_p2,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS seq_p3
-    FROM coct42_reg.reg_resource r
-    JOIN coct42_reg.reg_path p    ON r.reg_path_id = p.reg_path_id
-    JOIN coct42_reg.reg_content c ON c.reg_content_id = r.reg_content_id
-    WHERE p.reg_path_value = '/_system/governance/apimgt/customsequences/out'
-      AND r.reg_media_type  = 'application/vnd.wso2.sequence'
-),
--- Extract STATIC registry endpoint file reference from inSequence
--- Matches: conf:repository/resources/endpoints/some_file.xml  (no fn:concat = static)
-in_seq_static_ref AS (
-    SELECT
-        i.reg_name AS seq_name,
-        REGEXP_SUBSTR(
-            i.seq_p1 || i.seq_p2,
-            'conf:[^'']*?/endpoints/([^'']+\.xml)',
-            1, 1, 'n', 1
-        ) AS endpoint_filename,
-        -- Flag if dynamic (fn:concat present near endpoint path)
-        CASE 
-            WHEN REGEXP_LIKE(i.seq_p1 || i.seq_p2, 'fn:concat[^>]*endpoint', 'i') THEN 'Y'
-            WHEN REGEXP_LIKE(i.seq_p2 || i.seq_p3, 'fn:concat[^>]*endpoint', 'i') THEN 'Y'
-            ELSE 'N'
-        END AS is_dynamic,
-        -- Flag if key-expression (runtime resolved)
-        CASE 
-            WHEN REGEXP_LIKE(i.seq_p1 || i.seq_p2, 'key-expression', 'i') THEN 'Y'
-            WHEN REGEXP_LIKE(i.seq_p2 || i.seq_p3, 'key-expression', 'i') THEN 'Y'
-            ELSE 'N'
-        END AS is_key_expression
-    FROM in_seq_content i
-),
--- Extract STATIC registry endpoint file reference from outSequence
-out_seq_static_ref AS (
-    SELECT
-        o.reg_name AS seq_name,
-        REGEXP_SUBSTR(
-            o.seq_p1 || o.seq_p2,
-            'conf:[^'']*?/endpoints/([^'']+\.xml)',
-            1, 1, 'n', 1
-        ) AS endpoint_filename,
-        CASE 
-            WHEN REGEXP_LIKE(o.seq_p1 || o.seq_p2, 'fn:concat[^>]*endpoint', 'i') THEN 'Y'
-            WHEN REGEXP_LIKE(o.seq_p2 || o.seq_p3, 'fn:concat[^>]*endpoint', 'i') THEN 'Y'
-            ELSE 'N'
-        END AS is_dynamic,
-        CASE 
-            WHEN REGEXP_LIKE(o.seq_p1 || o.seq_p2, 'key-expression', 'i') THEN 'Y'
-            WHEN REGEXP_LIKE(o.seq_p2 || o.seq_p3, 'key-expression', 'i') THEN 'Y'
-            ELSE 'N'
-        END AS is_key_expression
-    FROM out_seq_content o
-),
--- Read static endpoint file content for inSequence reference
-in_endpoint_content AS (
-    SELECT
-        iref.seq_name,
-        iref.endpoint_filename,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS ep_p1,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS ep_p2,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS ep_p3
-    FROM in_seq_static_ref iref
-    JOIN coct42_reg.reg_resource r  ON r.reg_name = iref.endpoint_filename
-    JOIN coct42_reg.reg_path p      ON r.reg_path_id = p.reg_path_id
-                                   AND p.reg_path_value LIKE '%/repository/resources/endpoints%'
-    JOIN coct42_reg.reg_content c   ON c.reg_content_id = r.reg_content_id
-    WHERE iref.endpoint_filename IS NOT NULL
-      AND iref.is_dynamic = 'N'
-),
--- Read static endpoint file content for outSequence reference
-out_endpoint_content AS (
-    SELECT
-        oref.seq_name,
-        oref.endpoint_filename,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)))    AS ep_p1,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) AS ep_p2,
-        UTL_RAW.CAST_TO_VARCHAR2(HEXTORAW(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) AS ep_p3
-    FROM out_seq_static_ref oref
-    JOIN coct42_reg.reg_resource r  ON r.reg_name = oref.endpoint_filename
-    JOIN coct42_reg.reg_path p      ON r.reg_path_id = p.reg_path_id
-                                   AND p.reg_path_value LIKE '%/repository/resources/endpoints%'
-    JOIN coct42_reg.reg_content c   ON c.reg_content_id = r.reg_content_id
-    WHERE oref.endpoint_filename IS NOT NULL
-      AND oref.is_dynamic = 'N'
-)
-SELECT
-    e.API_NAME,
-    e.CONTEXT,
-    e.ORGANIZATION,
-    e.API_UUID,
-    e.reg_name,
-    -- SuspensionLogic
-    CASE
-        WHEN REGEXP_LIKE(e.EndpointConfig,          'suspend', 'i') THEN 'Suspension Enabled'
-        WHEN REGEXP_LIKE(i.seq_p1 || i.seq_p2,      'suspend', 'i') THEN 'Suspension Enabled'
-        WHEN REGEXP_LIKE(i.seq_p2 || i.seq_p3,      'suspend', 'i') THEN 'Suspension Enabled'
-        WHEN REGEXP_LIKE(o.seq_p1 || o.seq_p2,      'suspend', 'i') THEN 'Suspension Enabled'
-        WHEN REGEXP_LIKE(o.seq_p2 || o.seq_p3,      'suspend', 'i') THEN 'Suspension Enabled'
-        WHEN REGEXP_LIKE(ie.ep_p1 || ie.ep_p2,      'suspend', 'i') THEN 'Suspension Enabled'
-        WHEN REGEXP_LIKE(ie.ep_p2 || ie.ep_p3,      'suspend', 'i') THEN 'Suspension Enabled'
-        WHEN REGEXP_LIKE(oe.ep_p1 || oe.ep_p2,      'suspend', 'i') THEN 'Suspension Enabled'
-        WHEN REGEXP_LIKE(oe.ep_p2 || oe.ep_p3,      'suspend', 'i') THEN 'Suspension Enabled'
-        -- Dynamic endpoints - cannot determine
-        WHEN isr.is_dynamic = 'Y' OR isr.is_key_expression = 'Y'   THEN 'Manual Check Required'
-        WHEN osr.is_dynamic = 'Y' OR osr.is_key_expression = 'Y'   THEN 'Manual Check Required'
-        ELSE 'Default Suspension'
-    END AS SuspensionLogic,
-    -- SuspensionSource: exactly where suspend found or why manual check needed
-    CASE
-        -- suspend found in endpointConfig
-        WHEN REGEXP_LIKE(e.EndpointConfig, 'suspend', 'i')
-            THEN 'EndpointConfig'
-            || CASE WHEN REGEXP_LIKE(i.seq_p1||i.seq_p2,'suspend','i') OR REGEXP_LIKE(i.seq_p2||i.seq_p3,'suspend','i') THEN ', ' || e.inSequence ELSE '' END
-            || CASE WHEN REGEXP_LIKE(o.seq_p1||o.seq_p2,'suspend','i') OR REGEXP_LIKE(o.seq_p2||o.seq_p3,'suspend','i') THEN ', ' || e.outSequence ELSE '' END
-            || CASE WHEN REGEXP_LIKE(ie.ep_p1||ie.ep_p2,'suspend','i') OR REGEXP_LIKE(ie.ep_p2||ie.ep_p3,'suspend','i') THEN ', ' || ie.endpoint_filename ELSE '' END
-            || CASE WHEN REGEXP_LIKE(oe.ep_p1||oe.ep_p2,'suspend','i') OR REGEXP_LIKE(oe.ep_p2||oe.ep_p3,'suspend','i') THEN ', ' || oe.endpoint_filename ELSE '' END
-        -- suspend found in sequence directly
-        WHEN REGEXP_LIKE(i.seq_p1||i.seq_p2,'suspend','i') OR REGEXP_LIKE(i.seq_p2||i.seq_p3,'suspend','i')
-            THEN e.inSequence
-            || CASE WHEN REGEXP_LIKE(o.seq_p1||o.seq_p2,'suspend','i') OR REGEXP_LIKE(o.seq_p2||o.seq_p3,'suspend','i') THEN ', ' || e.outSequence ELSE '' END
-            || CASE WHEN REGEXP_LIKE(ie.ep_p1||ie.ep_p2,'suspend','i') OR REGEXP_LIKE(ie.ep_p2||ie.ep_p3,'suspend','i') THEN ', ' || ie.endpoint_filename ELSE '' END
-            || CASE WHEN REGEXP_LIKE(oe.ep_p1||oe.ep_p2,'suspend','i') OR REGEXP_LIKE(oe.ep_p2||oe.ep_p3,'suspend','i') THEN ', ' || oe.endpoint_filename ELSE '' END
-        WHEN REGEXP_LIKE(o.seq_p1||o.seq_p2,'suspend','i') OR REGEXP_LIKE(o.seq_p2||o.seq_p3,'suspend','i')
-            THEN e.outSequence
-            || CASE WHEN REGEXP_LIKE(ie.ep_p1||ie.ep_p2,'suspend','i') OR REGEXP_LIKE(ie.ep_p2||ie.ep_p3,'suspend','i') THEN ', ' || ie.endpoint_filename ELSE '' END
-            || CASE WHEN REGEXP_LIKE(oe.ep_p1||oe.ep_p2,'suspend','i') OR REGEXP_LIKE(oe.ep_p2||oe.ep_p3,'suspend','i') THEN ', ' || oe.endpoint_filename ELSE '' END
-        -- suspend found in static endpoint file
-        WHEN REGEXP_LIKE(ie.ep_p1||ie.ep_p2,'suspend','i') OR REGEXP_LIKE(ie.ep_p2||ie.ep_p3,'suspend','i')
-            THEN ie.endpoint_filename
-            || CASE WHEN REGEXP_LIKE(oe.ep_p1||oe.ep_p2,'suspend','i') OR REGEXP_LIKE(oe.ep_p2||oe.ep_p3,'suspend','i') THEN ', ' || oe.endpoint_filename ELSE '' END
-        WHEN REGEXP_LIKE(oe.ep_p1||oe.ep_p2,'suspend','i') OR REGEXP_LIKE(oe.ep_p2||oe.ep_p3,'suspend','i')
-            THEN oe.endpoint_filename
-        -- Dynamic endpoint - cannot determine automatically
-        WHEN isr.is_dynamic = 'Y'
-            THEN 'Dynamic endpoint in ' || e.inSequence || ' (fn:concat) - Manual Check Required'
-        WHEN isr.is_key_expression = 'Y'
-            THEN 'Runtime endpoint key-expression in ' || e.inSequence || ' - Manual Check Required'
-        WHEN osr.is_dynamic = 'Y'
-            THEN 'Dynamic endpoint in ' || e.outSequence || ' (fn:concat) - Manual Check Required'
-        WHEN osr.is_key_expression = 'Y'
-            THEN 'Runtime endpoint key-expression in ' || e.outSequence || ' - Manual Check Required'
-        ELSE 'None'
-    END AS SuspensionSource,
-    e.reg_content_id,
-    e.reg_path_value,
-    e.EndpointConfig,
-    e.inSequence,
-    e.outSequence
-FROM extracted e
-LEFT JOIN in_seq_content       i   ON i.reg_name        = e.inSequence  || '.xml'
-LEFT JOIN out_seq_content      o   ON o.reg_name        = e.outSequence || '.xml'
-LEFT JOIN in_seq_static_ref    isr ON isr.seq_name      = e.inSequence  || '.xml'
-LEFT JOIN out_seq_static_ref   osr ON osr.seq_name      = e.outSequence || '.xml'
-LEFT JOIN in_endpoint_content  ie  ON ie.seq_name       = e.inSequence  || '.xml'
-LEFT JOIN out_endpoint_content oe  ON oe.seq_name       = e.outSequence || '.xml'
-;
+ALS	/t/aaa.com/als/v1	aaa.com	c6f3df68-f5da-4d89-979e-f163db878f0a	api	Manual Check Required	Dynamic endpoint in aaa_als_seq_in (fn:concat) - Manual Check Required	15719621	/_system/governance/apimgt/applicationdata/apis/c6f3df68-f5da-4d89-979e-f163db878f0a/1	{"production_endpoints":{"url":"default"},"sandbox_endpoints":{"url":"default"},"endpoint_type":"default"}	aaa_als_seq_in	aaa_als_seq_out
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sequence name="aaa_als_seq_in" trace="disable" xmlns="http://ws.apache.org/ns/synapse">
+    <property expression="get-property('axis2','REST_URL_POSTFIX')" name="Resource_Path" scope="default" type="STRING"/>
+    <property expression="fn:substring-after(get-property('api.ut.application.name'), '-')" name="firmName" scope="default" type="STRING"/>
+    <property name="quote" scope="default" type="STRING" value="'"/>
+    <property expression="get-property('axis2', 'HTTP_METHOD')" name="Http_Method" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    <property expression="$trp:uuid" name="Uuid" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    <property expression="$trp:source-id" name="Source-id" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    <property expression="$url:apiresponse" name="apiresponse" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    <property name="delimiter" scope="default" type="STRING" value="/"/>
+    <property expression="fn:concat(get-property('Resource_Path'), get-property('delimiter'), get-property('Http_Method'))" name="ConcatenatedProperty" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    <property expression="get-property('MessageID')" name="apiMessageUUID" scope="default" type="STRING" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    <log level="custom">
+        <property name="apiEvent" value="START"/>
+        <property expression="get-property('apiMessageUUID')" name="apiMessageID" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('Uuid')" name="apiClientUUID" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('SYSTEM_TIME')" name="apiTimestamp" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('Source-id')" name="Source-id" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('ConcatenatedProperty')" name="apiRequestPath" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('api.ut.userId')" name="apiUserId" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="fn:concat(get-property('Http_Method'), get-property('REST_API_CONTEXT'), get-property('API_ELECTED_RESOURCE'))" name="apiContext" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('api.ut.application.name')" name="apiAppName" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+    </log>
+    <log level="custom">
+        <property name="apiEvent" value="AFTERCUSTVLD"/>
+        <property expression="get-property('apiMessageUUID')" name="apiMessageID" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('Uuid')" name="apiClientUUID" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="get-property('SYSTEM_TIME')" name="apiTimestamp" xmlns:ns3="http://org.apache.synapse/xsd" xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope"/>
+        <property expression="fn:concat('$ctx:target_endpoint//Organization[@idpfirm=', get-property('quote'), $ctx:firmName, get-property('quote'), ']/node()[@ctx=', get-property('quote'), $ctx:REST_API_CONTEXT, get-property('quote'), ']/text()')" name="sep_xpath_log1"/>
+    </log>
+    <property expression="fn:concat('$ctx:target_endpoint//Organization[@idpfirm=', get-property('quote'), $ctx:firmName, get-property('quote'), ']/node()[@ctx=', get-property('quote'), $ctx:REST_API_CONTEXT, get-property('quote'), ']/text()')" name="sep_xpath" scope="default" type="STRING"/>
+    <property expression="get-property('registry', 'conf:repository/resources/endpoints/als_endpoints.xml')" name="target_endpoint" scope="default" type="OM"/>
+    <property expression="evaluate($ctx:sep_xpath)" name="service-endpoint" scope="default" type="STRING"/>
+    <log level="custom">
+        <property expression="$ctx:Resource_Path" name="Res_Path"/>
+        <property expression="$ctx:REST_API_CONTEXT" name="Res_Ctx"/>
+        <property expression="get-property('sep_xpath')" name="sep_xpath"/>
+        <property expression="get-property('service-endpoint')" name="service-endpoint"/>
+        <property expression="fn:concat($ctx:service-endpoint, $ctx:Resource_Path)" name="To-Header"/>
+    </log>
+    <header expression="fn:concat($ctx:service-endpoint, $ctx:Resource_Path)" name="To" scope="default"/>
+</sequence>
+
+    <property expression="get-property('registry', 'conf:repository/resources/endpoints/als_endpoints.xml')" name="target_endpoint" scope="default" type="OM"/>
+we have endpoint xml file, what should we refer here? also explain what endpoint file content and flow
