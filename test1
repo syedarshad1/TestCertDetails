@@ -1,79 +1,30 @@
-WITH reg_apis AS (
-  SELECT
-    REGEXP_SUBSTR(p.reg_path_value,
-      '/apis/([0-9a-fA-F-]{36})/',
-      1, 1, NULL, 1)             AS api_uuid,
-    TO_NUMBER(REGEXP_SUBSTR(p.reg_path_value,
-      '/apis/[0-9a-fA-F-]{36}/([0-9]+)',
-      1, 1, NULL, 1))            AS rev,
-    r.reg_content_id
-  FROM   coct42_reg.reg_resource r
-  JOIN   coct42_reg.reg_path p
-    ON   p.reg_path_id = r.reg_path_id
-  WHERE  r.reg_name = 'api'
-    AND  p.reg_path_value LIKE
-         '/_system/governance/apimgt/applicationdata/apis/%'
-),
-
-latest_rev AS (
-  SELECT
-    api_uuid,
-    MAX(reg_content_id) KEEP
-      (DENSE_RANK LAST ORDER BY rev) AS reg_content_id
-  FROM   reg_apis
-  WHERE  api_uuid IS NOT NULL
-  GROUP BY api_uuid
-),
-
-decoded AS (
-  SELECT
-    lr.api_uuid,
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 1)))    ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 2001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 4001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 6001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 8001))) ||
-    TO_CLOB(utl_raw.cast_to_varchar2(
-      dbms_lob.substr(c.reg_content_data, 2000, 10001))) AS clob_txt
-  FROM   latest_rev lr
-  LEFT JOIN coct42_reg.reg_content c
-    ON   c.reg_content_id = lr.reg_content_id
-)
-
-SELECT
-  a.API_NAME,
-  a.API_VERSION,
-  a.CONTEXT,
-  a.STATUS,
-  a.ORGANIZATION,
-  a.UPDATED_TIME,
-  CASE
-    WHEN d.clob_txt IS NULL                          THEN 'No registry entry'
-    WHEN REGEXP_LIKE(d.clob_txt, 'suspendErrorCode') THEN 'With suspend logic'
-    ELSE 'No suspend logic'
-  END AS suspend_status,
-  -- Strip newlines, carriage returns and replace double quotes
-  -- so the value stays in a single CSV cell
-  REPLACE(
-    REPLACE(
-      REPLACE(
-        REPLACE(
-          REGEXP_SUBSTR(
-            d.clob_txt,
-            '<endpointConfig>.*?</endpointConfig>',
-            1, 1, 'n'
-          ),
-        CHR(10), ''),   -- remove line feeds
-      CHR(13), ''),     -- remove carriage returns
-    CHR(9),  ''),       -- remove tabs
-  '"', '''')           -- replace double quotes with single quotes
-  AS endpoint_config
-FROM   COCT42_AM.AM_API a
-LEFT JOIN decoded d
-  ON   a.API_UUID = d.api_uuid
-ORDER BY a.UPDATED_TIME DESC;
+SELECT 
+    a.API_NAME,
+    a.CONTEXT,
+    a.ORGANIZATION,
+    a.API_UUID,
+    r.reg_name,
+    r.reg_content_id,
+    p.reg_path_value,
+    UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 32767, 1)) AS reg_content_data_text
+FROM 
+    COCT42_AM.AM_API a
+    JOIN coct42_reg.reg_path p
+        ON p.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
+    JOIN coct42_reg.reg_resource r
+        ON r.reg_path_id = p.reg_path_id
+        AND r.reg_name = 'api'
+        AND p.reg_path_value = (
+            SELECT p2.reg_path_value
+            FROM coct42_reg.reg_path p2
+            JOIN coct42_reg.reg_resource r2
+                ON r2.reg_path_id = p2.reg_path_id
+                AND r2.reg_name = 'api'
+            WHERE p2.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
+            ORDER BY TO_NUMBER(REGEXP_SUBSTR(p2.reg_path_value, '\d+$')) DESC
+            FETCH FIRST 1 ROW ONLY
+        )
+    JOIN coct42_reg.reg_content c
+        ON c.reg_content_id = r.reg_content_id
+WHERE 
+    a.API_UUID = 'fd1b5417-eeea-4fef-b2df-c36affe0913e';
