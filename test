@@ -24,6 +24,91 @@ latest_rev AS (
   WHERE  api_uuid IS NOT NULL
   GROUP BY api_uuid
 ),
+api_blob AS (
+  SELECT
+    lr.api_uuid,
+    lr.latest_rev,
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,1)))    ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,2001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,4001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,6001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,8001)))  ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,10001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,12001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,14001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,16001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,18001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,20001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,22001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,24001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,26001))) ||
+    TO_CLOB(utl_raw.cast_to_varchar2(dbms_lob.substr(c.reg_content_data,2000,28001))) AS clob_txt
+  FROM   latest_rev lr
+  LEFT JOIN coct42_reg.reg_content c
+    ON   c.reg_content_id = lr.reg_content_id
+),
+api_analysis AS (
+  SELECT
+    api_uuid,
+    clob_txt,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,
+             CHR(60)||'endpointConfig'||CHR(62)) > 0
+        THEN REPLACE(REPLACE(REPLACE(REPLACE(
+               utl_raw.cast_to_varchar2(
+                 dbms_lob.substr(clob_txt, 2000,
+                   DBMS_LOB.INSTR(clob_txt,
+                     CHR(60)||'endpointConfig'||CHR(62)))),
+             CHR(10),''),CHR(13),''),CHR(9),''),CHR(34),'')
+      ELSE NULL
+    END                           AS api_endpoint_config,
+    CASE
+      WHEN DBMS_LOB.INSTR(UPPER(clob_txt),'SUSPEND')>0
+        THEN 1 ELSE 0
+    END                           AS api_has_suspend,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,
+             'suspendDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
+        OR   DBMS_LOB.INSTR(clob_txt,
+               'suspendDuration'||CHR(62)||'0'||CHR(60))>0
+        THEN 1 ELSE 0
+    END                           AS api_suspend_dur_zero,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,
+             'suspendMaxDuration'||CHR(34)||':'||CHR(34)||'0'||CHR(34))>0
+        OR   DBMS_LOB.INSTR(clob_txt,
+               'suspendMaxDuration'||CHR(62)||'0'||CHR(60))>0
+        THEN 1 ELSE 0
+    END                           AS api_suspend_max_zero,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,CHR(34)||'-1'||CHR(34))>0
+        OR   DBMS_LOB.INSTR(clob_txt,
+               'errorCodes'||CHR(62)||'-1'||CHR(60))>0
+        THEN 1 ELSE 0
+    END                           AS api_error_minus1,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,'suspendErrorCode')>0
+        THEN 1 ELSE 0
+    END                           AS api_has_error_code,
+    CASE
+      WHEN DBMS_LOB.INSTR(clob_txt,
+             'actionDuration'||CHR(34)||':'||CHR(34))>0
+        THEN SUBSTR(
+               utl_raw.cast_to_varchar2(
+                 dbms_lob.substr(clob_txt, 30,
+                   DBMS_LOB.INSTR(clob_txt,
+                     'actionDuration'||CHR(34)||':'||CHR(34))+17)),
+               1,
+               INSTR(
+                 utl_raw.cast_to_varchar2(
+                   dbms_lob.substr(clob_txt, 30,
+                     DBMS_LOB.INSTR(clob_txt,
+                       'actionDuration'||CHR(34)||':'||CHR(34))+17)),
+                 CHR(34)) - 1)
+      ELSE NULL
+    END                           AS api_action_duration
+  FROM   api_blob
+),
 seq_resources AS (
   SELECT
     lr.api_uuid,
@@ -204,4 +289,59 @@ seq_suspend AS (
   FROM   seq_analysis
   GROUP BY api_uuid
 )
-SELECT COUNT(*) FROM seq_suspend;
+SELECT
+  a.API_NAME,
+  a.API_VERSION,
+  a.CONTEXT,
+  a.STATUS,
+  a.ORGANIZATION                  AS TENANT,
+  a.UPDATED_TIME,
+  CASE
+    WHEN ec.clob_txt IS NULL
+      THEN 'No registry entry'
+    WHEN ss.has_suspend=1
+      AND (ss.suspend_dur_zero=1 OR ss.suspend_max_zero=1)
+      AND  ss.error_code_minus1=1
+      THEN 'Explicit disable (all error codes) - seq: '||ss.seq_name
+    WHEN ss.has_suspend=1
+      AND (ss.suspend_dur_zero=1 OR ss.suspend_max_zero=1)
+      AND  ss.has_error_code=1
+      THEN 'Explicit disable (specific error code) - seq: '||ss.seq_name
+    WHEN ss.has_suspend=1
+      THEN 'Active suspension - seq: '||ss.seq_name
+    WHEN ec.api_has_suspend=1
+      AND (ec.api_suspend_dur_zero=1 OR ec.api_suspend_max_zero=1)
+      AND  ec.api_error_minus1=1
+      THEN 'Explicit disable (all error codes) - endpointConfig'
+    WHEN ec.api_has_suspend=1
+      AND (ec.api_suspend_dur_zero=1 OR ec.api_suspend_max_zero=1)
+      AND  ec.api_has_error_code=1
+      THEN 'Explicit disable (specific error code) - endpointConfig'
+    WHEN ec.api_has_suspend=1
+      THEN 'Active suspension - endpointConfig'
+    ELSE 'Default suspension'
+  END                             AS SUSPENSION_LOGIC,
+  CASE
+    WHEN ss.has_suspend=1     THEN ss.seq_name
+    WHEN ec.api_has_suspend=1 THEN 'api'
+    ELSE NULL
+  END                             AS SEQUENCE_FILE,
+  CASE
+    WHEN ss.has_suspend=1     THEN 'Custom sequence'
+    WHEN ec.api_has_suspend=1 THEN 'endpointConfig'
+    ELSE NULL
+  END                             AS SEQUENCE_TYPE,
+  COALESCE(
+    ss.seq_endpoint_config,
+    ec.api_endpoint_config)        AS ENDPOINT_CONFIG,
+  COALESCE(
+    ss.seq_action_duration,
+    ec.api_action_duration,
+    '120000ms (synapse global default)')
+                                  AS TIMEOUT_MS
+FROM   COCT42_AM.AM_API a
+LEFT JOIN api_analysis ec
+  ON   ec.api_uuid = a.API_UUID
+LEFT JOIN seq_suspend ss
+  ON   ss.api_uuid = a.API_UUID
+ORDER BY a.ORGANIZATION, SUSPENSION_LOGIC, a.API_NAME, a.API_VERSION;
