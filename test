@@ -1,20 +1,5 @@
-SELECT
-  CHR(60) AS open_bracket,
-  CHR(62) AS close_bracket,
-  CHR(34) AS double_quote,
-  DBMS_LOB.INSTR(TO_CLOB('hello world'), 'world') AS instr_test
-FROM dual;
+<	>	"	7
 
-SELECT
-  DBMS_LOB.INSTR(
-    TO_CLOB('test endpointConfig here'),
-    CHR(60)||'endpointConfig'||CHR(62)
-  ) AS pos
-FROM dual;
+0
 
-SELECT
-  INSTR(
-    'actionDuration":"60000"',
-    'actionDuration'||CHR(34)||':'||CHR(34)
-  ) AS pos
-FROM dual;
+1
