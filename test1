@@ -1,30 +1,10 @@
-SELECT 
-    a.API_NAME,
-    a.CONTEXT,
-    a.ORGANIZATION,
-    a.API_UUID,
-    r.reg_name,
-    r.reg_content_id,
-    p.reg_path_value,
-    UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 32767, 1)) AS reg_content_data_text
-FROM 
-    COCT42_AM.AM_API a
-    JOIN coct42_reg.reg_path p
-        ON p.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
-    JOIN coct42_reg.reg_resource r
-        ON r.reg_path_id = p.reg_path_id
-        AND r.reg_name = 'api'
-        AND p.reg_path_value = (
-            SELECT p2.reg_path_value
-            FROM coct42_reg.reg_path p2
-            JOIN coct42_reg.reg_resource r2
-                ON r2.reg_path_id = p2.reg_path_id
-                AND r2.reg_name = 'api'
-            WHERE p2.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/%'
-            ORDER BY TO_NUMBER(REGEXP_SUBSTR(p2.reg_path_value, '\d+$')) DESC
-            FETCH FIRST 1 ROW ONLY
-        )
-    JOIN coct42_reg.reg_content c
-        ON c.reg_content_id = r.reg_content_id
-WHERE 
-    a.API_UUID = 'fd1b5417-eeea-4fef-b2df-c36affe0913e';
+ORA-06502: PL/SQL: numeric or value error: raw variable length too long
+ORA-06512: at line 1
+06502. 00000 -  "PL/SQL: numeric or value error%s"
+*Cause:    An arithmetic, numeric, string, conversion, or constraint error
+           occurred. For example, this error occurs if an attempt is made to
+           assign the value NULL to a variable declared NOT NULL, or if an
+           attempt is made to assign an integer larger than 99 to a variable
+           declared NUMBER(2).
+*Action:   Change the data, how it is manipulated, or how it is declared so
+           that values do not violate constraints.
