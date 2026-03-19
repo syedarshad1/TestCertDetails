@@ -1,1 +1,9 @@
-REG_CONTENT_DATA	BLOB
+-- Test DBMS_LOB.INSTR on CLOB (not BLOB)
+SELECT
+  DBMS_LOB.INSTR(
+    TO_CLOB(utl_raw.cast_to_varchar2(
+      dbms_lob.substr(c.reg_content_data, 2000, 1))),
+    'suspend'
+  ) AS test_clob_instr
+FROM coct42_reg.reg_content c
+WHERE c.reg_content_id = 18560005;
