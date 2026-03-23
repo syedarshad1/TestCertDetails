@@ -1,43 +1,382 @@
-1. I have this table
+08:30Analysis timeframe start. Davis evaluates performance across timeframe (for example, 3 of 5 minutes show anomalous performance). No event reported at this time.
+08:34Earliest event in analysis timeframe reported, backdated to analysis timeframe start. Problem is in processing state awaiting completion of topology analysis.
+08:50Problem changed from frequent to abnormal. Problem is raised and pushed to Dynatrace web UI and Problems API.
+08:50Davis completes processing of the problem. Alerts are delivered via alerting profiles.
+14:51Problem closed. Davis confirms the problem is resolved after observing normal conditions. The problem was in the open state for 6 hours 17 minutes (the duration is checked against alerting profile duration criteria).
 
-    SELECT * FROM COCT42_AM.AM_API 
-    
-    Where API_NAME, API_NAME, CONTEXT, organization, API_UUID some other fields
+2 Long garbage-collection time events
+Garbage collection is suspending process /opt/codeconnect/wso2am-4.2.0-gw/lib/tomcat on host lrk1rcdcapiap08.prod.local
+Events on:
+Process/opt/codeconnect/wso2am-4.2.0-gw/lib/tomcat on lrk1rcdcapiap10.prod.local
+Process/opt/codeconnect/wso2am-4.2.0-gw/lib/tomcat on lrk1rcdcapiap08.prod.local
 
-2. Then we have below table
-
-    SELECT 
-      r.reg_content_id,
-      r.reg_uuid,
-      r.reg_name,
-      r.reg_media_type,
-      p.reg_path_value,
-      r.reg_last_updated_time
-    FROM coct42_reg.reg_resource r
-    JOIN coct42_reg.reg_path p
-      ON r.reg_path_id = p.reg_path_id
-    WHERE --r.reg_name like  '%SNAP-Recipient%'
-          p.reg_path_value LIKE '%fd1b5417-eeea-4fef-b2df-c36affe0913e%'
-      --AND p.reg_path_value LIKE '%6f8d9aa2-077e-4b7a-9106-ba78d013dc5e%'
-        --r.reg_name like  '%rdp-fusion-integration-standard-endpoints.xml%'
-         --r.reg_uuid like  '%822bb236-3b62-4a86-88aa-c4c8521c9d52%'
-      --AND p.reg_path_value  LIKE '%Billpay%'
-      --AND r.reg_tenant_id = 12
-    ORDER BY r.reg_last_updated_time DESC;
-    
-    where we have   r.reg_content_id,  r.reg_uuid,  r.reg_name,  r.reg_media_type,  p.reg_path_value,  r.reg_last_updated_time
-    
-    (reg_path_value should pick latest numeric number "/_system/governance/apimgt/applicationdata/apis/fd1b5417-eeea-4fef-b2df-c36affe0913e/2", "fd1b5417-eeea-4fef-b2df-c36affe0913e" is API_UUID and reg_name = "api")
+Understand why the garbage collection duration increases over time.
 
 
-    example: 15781073	b3a7607d-dcdb-45ed-86da-8c562d1c883d	api	application/vnd.wso2-api+xml	/_system/governance/apimgt/applicationdata/apis/fd1b5417-eeea-4fef-b2df-c36affe0913e/2	09-AUG-25 10.29.09.794000000 AM
+Memory Profiling
+-----------------
 
-3. Now we have to get reg_content_id from 2nd steps and search in below table
 
-    SELECT * FROM coct42_reg.reg_content c WHERE c.reg_content_id = 15781073;
+Hosts
+lrk1rcdcapiap08.prod.local
+Processes
+/opt/codeconnect/wso2am-4.2.0-gw/lib/tomcat
+Memory profiling
+Memory profiling of '/opt/codeconnect/wso2am-4.2.0-gw/lib/tomcat'
+View Documentation
+Configure view
+View:
+All allocations
+Survivors
+Filter by
+Survived memory over time (5.04 TB survived)
+Survived memory
+Garbage collection time
+Survived memory
+Garbage collection time
+08:30
+09:00
+09:30
+10:00
+10:30
+11:00
+11:30
+12:00
+12:30
+13:00
+13:30
+14:00
+14:30
+15:00
+0 B
+30 GB
+60 GB
+90 GB
+0 ms
+25 s
+50 s
+1 min 15 s
+Survivor hotspots
+Flame graph
+Hotspot APIs
+Java
+Built-In JRE
+Built-In Apache
+Lang
+Built-In Hibernate
+Built-In JBoss
+/opt/codeconnect/wso2am-4.2.0-gw/lib/tomcat
+Thread.run
+ThreadPoolExecutor$Worker.run
+AbstractMultiworkerIOReactor$Worker.run
+BatchEventProcessor.run
+ThreadPoolExecutor.runWorker
+BaseIOReactor.execute
+BatchEventProcessor.processEvents
+NativeWorkerPool$1.run
+DataProcessAndPublishingAgent.run
+FutureTask.run
+ScheduledThreadPoolExecutor$ScheduledFutureTask.run
+AbstractIOReactor.execute
+RingBufferLogEventHandler.onEvent
+ServerWorker.run
+ClientWorker.run
+DataProcessAndPublishingAgent.run_aroundBody4
+Executors$RunnableAdapter.call
+FutureTask.runAndReset
+AbstractIOReactor.processEvents
+AbstractIOReactor.processNewChannels
+RingBufferLogEventHandler.onEvent
+ServerWorker.processNonEntityEnclosingRESTHandler
+PassThroughConfiguration.getExpectedMaxQueueingTime
+ServerWorker.processEntityEnclosingRequest
+AxisEngine.receive
+AxisWebserviceIntrospectionWrapper.SynapseClientWorkerRunEnter
+JSONObject.toString
+Thread.run
+Executors$RunnableAdapter.call
+AbstractIOReactor.processEvent
+BaseIOReactor.sessionCreated
+RingBufferLogEvent.execute
+AxisEngine.receive
+Long.valueOf
+ServerWorker.processNonEntityEnclosingRESTHandler
+MultitenantMessageReceiver.receive
+AxisWebserviceIntrospection.SynapseClientWorkerRunEnter
+JSONObject.toJSONString
+DataEndpoint$EventPublisher.run
+ThreadingView$ThreadingDataCollectorTask.run
+BaseIOReactor.readable
+BaseIOReactor.writable
+AbstractIODispatch.connected
+AsyncLogger.actualAsyncLog
+SynapseMessageReceiver.receive
+MultitenantMessageReceiver.receive
+AxisEngine.receive
+MultitenantMessageReceiver.processResponse
+AbstractReflectiveInvoker.invokeGetter
+JSONObject.toJSONString
+DataEndpoint$EventPublisher.publish
+ThreadingView.access$
+AbstractIODispatch.inputReady
+AbstractIODispatch.outputReady
+SSLIOSession.initialize
+ClientIODispatch.createConnection
+AwaitCompletionReliabilityStrategy.log
+Axis2SynapseEnvironment.injectMessage
+MultitenantMessageReceiver.processRequest
+MultitenantMessageReceiver.receive
+SynapseMessageReceiver.receive
+AxisEngine.receive
+AbstractReflectiveInvoker.getMethod
+JSONObject.toJSONString
+BinaryDataEndpoint.send
+ThreadingView.getBlockedWorkerPercentage
+ServerIODispatch.onInputReady
+ClientIODispatch.onInputReady
+SSLIOSession.isAppInputReady
+SSLEngineImpl.beginHandshake
+ClientIODispatch.createConnection
+LoggerConfig.log
+RESTRequestHandler.process
+MultitenantMessageReceiver.doREST
+MultitenantMessageReceiver.processRequest
+Axis2SynapseEnvironment.injectMessage
+SynapseCallbackReceiver.receive
+ReflectiveInvoker.getMethod
+StringBuffer.toString
+BinaryEventSender.sendBinaryPublishMessage
+ThreadingView.dumpAllThreads
+ServerIODispatch.onInputReady
+ClientIODispatch.onInputReady
+SSLIOSession.doHandshake
+TransportContext.kickstart
+ClientConnFactory.createConnection
+LoggerConfig.log
+RestRequestHandler.process
+MultitenantMessageReceiver.doNhttpREST
+MultitenantMessageReceiver.doREST
+RESTRequestHandler.process
+SynapseCallbackReceiver.handleMessage
+AbstractReflectiveInvoker.doGetMethod
+StringLatin1.newString
+ThreadImpl.getThreadInfo
+LoggingNHttpServerConnection.consumeInput
+LoggingNHttpClientConnection.consumeInput
+SSLIOSession.doRunTask
+ClientHandshakeContext.kickstart
+ClientConnFactory.createClientModeSSLsession
+LoggerConfig.processLogEvent
+RestRequestHandler.dispatchToAPI
+MultitenantMessageReceiver.processRESTRequest
+MultitenantMessageReceiver.doNhttpREST
+RestRequestHandler.process
+Axis2SynapseEnvironment.injectMessage
+CachingReflector.getMethod
+Arrays.copyOfRange
+ThreadImpl.getThreadInfo1
+DefaultNHttpServerConnection.consumeInput
+DefaultNHttpClientConnection.consumeInput
+SSLEngineImpl$DelegatedTask.run
+SSLHandshake.kickstart
+SSLIOSession.<init>
+LoggerConfig.logParent
+AbstractApiHandler.dispatchToAPI
+AxisEngine.receive
+MultitenantMessageReceiver.processRESTRequest
+RestRequestHandler.dispatchToAPI
+RESTRequestHandler.process
+SourceHandler.requestReceived
+LoggingNHttpServerConnection$LoggingNHttpMessageParser.parse
+TargetHandler.responseReceived
+AccessController.doPrivileged
+ClientHello$ClientHelloKickstartProducer.produce
+SSLIOSession.<init>
+LoggerConfig.log
+AbstractApiHandler.identifyAPI
+SynapseMessageReceiver.receive
+AxisEngine.receive
+AbstractApiHandler.dispatchToAPI
+RestRequestHandler.process
+LoggingNHttpServerConnection$LoggingNHttpMessageParser.parse
+AccessController.executePrivileged
+SSLExtensions.produce
+LoggerConfig.processLogEvent
+AbstractApiHandler.apiProcessNonDefaultStrategy
+Axis2SynapseEnvironment.injectMessage
+SynapseMessageReceiver.receive
+AbstractApiHandler.identifyAPI
+RestRequestHandler.dispatchToAPI
+AbstractMessageParser.parse
+SSLEngineImpl$DelegatedTask$DelegatedAction.run
+SSLExtension.produce
+LoggerConfig.callAppenders
+API.process
+RESTRequestHandler.process
+Axis2SynapseEnvironment.injectMessage
+AbstractApiHandler.apiProcessNonDefaultStrategy
+AbstractApiHandler.dispatchToAPI
+SSLEngineImpl$DelegatedTask$DelegatedAction.run
+AppenderControl.callAppender
+APIManagerExtensionHandler.handleRequest
+RestRequestHandler.process
+RESTRequestHandler.process
+API.process
+AbstractApiHandler.identifyAPI
+HandshakeContext.dispatch
+AppenderControl.callAppenderPreventRecursion
+APIManagerExtensionHandler.handleRequest_aroundBody2
+RestRequestHandler.dispatchToAPI
+RestRequestHandler.process
+APIManagerExtensionHandler.handleRequest
+AbstractApiHandler.apiProcessNonDefaultStrategy
+SSLHandshake.consume
+AppenderControl.callAppender0
+APIManagerExtensionHandler.mediate
+AbstractApiHandler.dispatchToAPI
+RestRequestHandler.dispatchToAPI
+APIManagerExtensionHandler.handleRequest_aroundBody2
+API.process
+CertificateMessage$T13CertificateConsumer.consume
+AppenderControl.tryCallAppender
+APIManagerExtensionHandler.mediate_aroundBody0
+AbstractApiHandler.identifyAPI
+AbstractApiHandler.dispatchToAPI
+APIManagerExtensionHandler.mediate
+APIManagerExtensionHandler.handleResponse
+CertificateMessage$T13CertificateConsumer.onConsumeCertificate
+SequenceMediator.mediate
+AbstractApiHandler.apiProcessNonDefaultStrategy
+AbstractApiHandler.identifyAPI
+APIManagerExtensionHandler.mediate_aroundBody0
+APIManagerExtensionHandler.handleResponse_aroundBody4
+CertificateMessage$T13CertificateConsumer.checkServerCerts
+AbstractListMediator.mediate
+API.process
+AbstractApiHandler.apiProcessNonDefaultStrategy
+SequenceMediator.mediate
+APIManagerExtensionHandler.mediate
+AbstractListMediator.mediate
+APIManagerExtensionHandler.handleRequest
+API.process
+AbstractListMediator.mediate
+APIManagerExtensionHandler.mediate_aroundBody0
+SequenceMediator.mediate
+APIManagerExtensionHandler.handleRequest_aroundBody2
+APIManagerExtensionHandler.handleRequest
+AbstractListMediator.mediate
+SequenceMediator.mediate
+AbstractListMediator.mediate
+APIManagerExtensionHandler.mediate
+APIManagerExtensionHandler.handleRequest_aroundBody2
+SequenceMediator.mediate
+AbstractListMediator.mediate
+AbstractListMediator.mediate
+APIManagerExtensionHandler.mediate_aroundBody0
+APIManagerExtensionHandler.mediate
+AbstractListMediator.mediate
+AbstractListMediator.mediate
+SequenceMediator.mediate
+APIManagerExtensionHandler.mediate_aroundBody0
+AbstractListMediator.mediate
+SequenceMediator.mediate
+AbstractListMediator.mediate
+SequenceMediator.mediate
+FilterMediator.mediate
+AbstractListMediator.mediate
+AbstractListMediator.mediate
+AbstractListMediator.mediate
+AbstractListMediator.mediate
+AbstractListMediator.mediate
+SequenceMediator.mediate
+AbstractListMediator.mediate
+AbstractListMediator.mediate
+SendMediator.mediate
+AbstractListMediator.mediate
+SequenceMediator.mediate
+Axis2SynapseEnvironment.send
+AbstractListMediator.mediate
+AbstractListMediator.mediate
+Axis2Sender.sendBack
+PropertyMediator.mediate
+ScriptMediator.mediate
+FilterMediator.mediate
+AbstractListMediator.mediate
+PropertyMediator.getResultValue
+ScriptMediator.invokeScript
+AbstractListMediator.mediate
+SendMediator.mediate
+SynapseXPath.stringValueOf
+ScriptMediator.mediateForInlineScript
+AbstractListMediator.mediate
+ResolvingEndpoint.send
+BaseXPath.evaluate
+CompiledScript.eval
+FilterMediator.mediate
+ResolvingEndpoint.sendMessage
+BaseXPath.selectNodes
+RhinoCompiledScript.eval
+AnonymousListMediator.mediate
+HTTPEndpoint.send
+BaseXPath.selectNodesForContext
+AbstractListMediator.mediate
+AbstractEndpoint.send
+DefaultXPathExpr.asList
+AbstractListMediator.mediate
+Axis2SynapseEnvironment.send
+DefaultFunctionCallExpr.evaluate
+SequenceMediator.mediate
+Axis2Sender.sendOn
+GetPropertyFunction.call
+SequenceMediator.mediate
+Axis2FlexibleMEPClient.send
+GetPropertyFunction.evaluate
+AbstractListMediator.mediate
+OperationClient.execute
+AbstractRegistry.getResource
+AbstractListMediator.mediate
+DynamicAxisOperation$DynamicOperationClient.executeImpl
+ScriptMediator.mediate
+SendMediator.mediate
+DynamicAxisOperation$DynamicOperationClient.send
+ScriptMediator.invokeScript
+DefaultEndpoint.send
+AxisEngine.send
+ScriptMediator.mediateForInlineScript
+AbstractEndpoint.send
+TenantTransportSender.invoke
+CompiledScript.eval
+ScriptMediator.processJSONPayload
+Axis2SynapseEnvironment.send
+AxisEngine.send
+RhinoCompiledScript.eval
+AbstractScriptEngine.eval
+Axis2Sender.sendOn
+PassThroughHttpSender.invoke
+_Unknown_Source__48995668.exec
+RhinoScriptEngine.eval
+Axis2FlexibleMEPClient.send
+_Unknown_Source__48995668.call
+RhinoScriptEngine.eval
+OperationClient.execute
+ScriptRuntime.doTopCall
+DynamicAxisOperation$DynamicOperationClient.executeImpl
+ContextFactory.doTopCall
+DynamicAxisOperation$DynamicOperationClient.send
+_Unknown_Source__48995668.call
+AxisEngine.send
+_Unknown_Source__48995668._c_script_0
+TenantTransportSender.invoke
+OptRuntime.call1
+AxisEngine.send
+NativeJavaMethod.call
+PassThroughHttpSender.invoke
+MemberBox.invoke
+Method.invoke
+DelegatingMethodAccessorImpl.invoke
+GeneratedMethodAccessor.invoke
+CommonScriptMessageContext.setPayloadJSON
+AbstractScriptEngine.eval
+RhinoScriptEngine.eval
 
-3. Now we need all the content from reg_content_data(this is blob datatype)
 
-4. Final output should be like
-
-    API_NAME, API_NAME, CONTEXT, organization, reg_name, reg_content_data
