@@ -1,20 +1,7 @@
-Hotspot API
+Survivor Hotspot
 
-Java
-8.61 TB
-137G
-Built-In JRE
-2.47 TB
-39G
-Lang
-618 GB
-24.6G
-Built-In Apache
-586 GB
-10.6G
-
-Survivor Hospot
-
+Top 100 survivor hotspots
+Method 	 Survived memory 	 Survived objects 	 Survived types 	 Actions 
 APIManagerExtensionHandler.mediate_aroundBody0
 Java | org.wso2.carbon.apimgt.gateway.handlers.ext
 947 GB
@@ -580,6 +567,18 @@ Built-In JRE | java.util
 LinkedList$Node
 
 
-Memory breakdown
-Allocated memory ​325 GB
-Survived memory ​947 GB
+Hotspot API
+------------
+
+Java
+8.61 TB
+137G
+Built-In JRE
+2.47 TB
+39G
+Lang
+618 GB
+24.6G
+Built-In Apache
+586 GB
+10.6G
