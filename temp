@@ -1,21 +1,585 @@
-Main technology	Apache Tomcat (9.0.106.0)
-Secondary technologies	
-Apache HTTP client (4.5.13), Apache Log4j (2.17.1), Apache Solr, Apache Synapse (4.0.0.wso2v20_91-FISGLOBALSUB-hotfix-1), Java (OpenJDK 17.0.17), Kotlin (2.1.21), Netty (HTTP Server 4.1.119.Final), OkHttp HTTP Client (4.11.0), and OpenTelemetry (Java)
-OneAgent version	1.307.58.20250224-131615 (Java)
-Bitness	64-bit
-Command line args	
-/opt/codeconnect/openjdk-17.0.17/bin/java -Xbootclasspath/a: -Xms12288m -Xmx12288m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/opt/codeconnect/wso2am-4.2.0-gw/repository/logs/heap-dump.hprof -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:GCTimeRatio=99 -XX:+DisableExplicitGC -XX:MetaspaceSize=256m -XX:MaxMetaspaceSize=1024m -Xloggc:/opt/codeconnect/wso2am-4.2.0-gw/repository/logs/gc.log -Dcom.sun.management.jmxremote -classpath :/opt/codeconnect/wso2am-4.2.0-gw/bin/org.wso2.carbon.bootstrap-4.8.1.jar:/opt/codeconnect/wso2am-4.2.0-gw/bin/tcpmon-1.0.jar:/opt/codeconnect/wso2am-4.2.0-gw/bin/tomcat-juli_9.0.106.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/activation-1.1.1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/ant-contrib-1.0b3.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/antlr4-runtime-4.7.1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/cava-toml-0.5.0.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/commons-codec-1.18.0.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/commons-lang-2.6.0.wso2v1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/commons-lang3-3.9.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/commons-logging-1.2.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/config-mapper-1.0.20.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/disruptor-3.4.2.wso2v1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/geronimo-jta_1.1_spec-1.1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/gson-2.9.1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/guava-32.1.3-jre.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/istack-commons-runtime-3.0.8.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/jackson-annotations-2.16.2.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/jackson-core-2.16.2.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/jackson-databind-2.16.2.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/jackson-dataformat-yaml-2.16.2.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/javax.annotation-api-1.3.2.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/javax.jms-api-2.0.1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/jaxb-api-2.4.0-b180830.0359.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/jaxb-impl-2.4.0-b180830.0438.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/jaxws-ri-2.3.2.wso2v1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/jinjava-2.6.0.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/jsoup-1.15.3.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/log4j-api-2.17.1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/log4j-core-2.17.1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/log4j-jcl-2.17.1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/org.wso2.carbon.server-4.8.1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/org.wso2.ciphertool-1.1.20.3.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/re2j-1.2.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/saaj-impl-1.5.0.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/slf4j-api-1.7.25.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/slf4j-jdk14-1.7.28.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/stax2-api-3.1.4.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/stax-ex-1.8.3.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/woodstox-core-asl-4.4.1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/xercesImpl-2.12.2.wso2v1.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/xml-apis-1.4.01.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/xml-resolver-1.2.jar:/opt/codeconnect/wso2am-4.2.0-gw/lib/endorsed/Saxon-HE-9.5.1-8.jar --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens java.rmi/sun.rmi.transport=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.naming/com.sun.jndi.ldap=ALL-UNNAMED --add-opens=java.base/sun.security.x509=ALL-UNNAMED -Djava.io.tmpdir=/opt/codeconnect/wso2am-4.2.0-gw/tmp -Dcatalina.base=/opt/codeconnect/wso2am-4.2.0-gw/lib/tomcat -Dwso2.server.standalone=true -Dcarbon.registry.root=/ -Djava.command=/opt/codeconnect/openjdk-17.0.17/bin/java -Dcarbon.home=/opt/codeconnect/wso2am-4.2.0-gw -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -Dcarbon.config.dir.path=/opt/codeconnect/wso2am-4.2.0-gw/repository/conf -Djava.util.logging.config.file=/opt/codeconnect/wso2am-4.2.0-gw/repository/conf/etc/logging-bridge.properties -Dcomponents.repo=/opt/codeconnect/wso2am-4.2.0-gw/repository/components/plugins -Dconf.location=/opt/codeconnect/wso2am-4.2.0(truncated)
-EXE name	java
-EXE path	/opt/codeconnect/openjdk-*/bin/java
-Extension technology	TOMCAT
-Host group	LRK_PROD_CodeConnect_APP
-JVM vendor	Red Hat, Inc.
-JVM version	17.0.17
-Java main class	
-org.wso2.carbon.bootstrap.Bootstrap
-Management zones	LRK_PROD_CodeConnect
-Ports	
-8672, 9443, 9763, 33859, 8099, 11111, 5672, 9099, 9611, 9999, 9711, 8243, 8021, 10711, 8280, and 9021
-Process group	/opt/codeconnect/wso2am-4.2.0-gw/lib/tomcat
-Process group detection result	
-catalina.base=/opt/codeconnect/wso2am-4.2.0-gw/lib/tomcat
+Hotspot API
+
+Java
+8.61 TB
+137G
+Built-In JRE
+2.47 TB
+39G
+Lang
+618 GB
+24.6G
+Built-In Apache
+586 GB
+10.6G
+
+Survivor Hospot
+
+APIManagerExtensionHandler.mediate_aroundBody0
+Java | org.wso2.carbon.apimgt.gateway.handlers.ext
+947 GB
+12.8G	
+byte[]
+and 132 more...
+HeapByteBuffer.<init>
+Built-In JRE | java.nio
+656 GB
+55.5M	
+byte[]
+TenantTransportSender.invoke
+Java | org.wso2.carbon.core.multitenancy.transports
+654 GB
+7.14G	
+byte[]
+and 81 more...
+JSONObject.toJSONString
+Java | org.json.simple
+438 GB
+546M	
+byte[]
+and 3 more...
+MultitenantMessageReceiver.processRESTRequest
+Java | org.wso2.carbon.core.multitenancy
+326 GB
+3.75G	
+byte[]
+and 59 more...
+CachingReflector.getMethod
+Java | <agent>
+264 GB
+11G	
+CachingReflector$ClassSignatureMemberKey
+Long.valueOf
+Lang | java.lang
+252 GB
+10.5G	
+Long
+RingBuffer.translateAndPublish
+Java | com.lmax.disruptor
+202 GB
+807M	
+byte[]
+and 7 more...
+Utils.lambda$
+Java | org.wso2.carbon.apimgt.gateway.handlers
+172 GB
+3.55G	
+byte[]
+and 1 more...
+ThreadImpl.getThreadInfo1
+Built-In JRE | sun.management
+170 GB
+2.99G	
+ThreadInfo
+and 4 more...
+CharArrayBuffer.expand
+Built-In Apache | org.apache.http.util
+159 GB
+153M	
+char[]
+UintMap.rehashTable
+Java | org.mozilla.javascript
+157 GB
+469M	
+int[]
+and 1 more...
+MemberBox.invoke
+Java | org.mozilla.javascript
+152 GB
+402M	
+byte[]
+and 43 more...
+ConstantPool.ensure
+Java | org.mozilla.classfile
+146 GB
+76.5M	
+byte[]
+URLMatcher.handleGetRegistryContext
+Java | org.wso2.carbon.registry.core.jdbc.handlers.filters
+145 GB
+2.84G	
+int[]
+and 2 more...
+BatchEventProcessor.processEvents
+Java | com.lmax.disruptor
+143 GB
+411M	
+byte[]
+and 13 more...
+BinaryEventSender.sendBinaryPublishMessage
+Java | org.wso2.carbon.databridge.agent.endpoint.binary
+127 GB
+76.7M	
+byte[]
+and 4 more...
+BodyCodegen.initBodyGeneration
+Java | org.mozilla.javascript.optimizer
+126 GB
+45.2M	
+int[]
+and 1 more...
+MultitenantMessageReceiver.processResponse
+Java | org.wso2.carbon.core.multitenancy
+124 GB
+2.57G	
+HashMap$Node
+and 51 more...
+ObjToIntMap.rehashTable
+Java | org.mozilla.javascript
+124 GB
+531M	
+int[]
+and 1 more...
+LoggingAppender.doAppend
+Java | org.wso2.carbon.logging.view.appenders
+123 GB
+2.38G	
+String[]
+and 21 more...
+Arrays.copyOf
+Built-In JRE | java.util
+115 GB
+925M	
+byte[]
+and 4 more...
+CharArrayBuffer.<init>
+Built-In Apache | org.apache.http.util
+102 GB
+781M	
+char[]
+AbstractQueuedSynchronizer$ConditionObject.await
+Built-In JRE | java.util.concurrent.locks
+102 GB
+3.19G	
+AbstractQueuedSynchronizer$ConditionNode
+DefaultFunctionCallExpr.evaluate
+Java | org.jaxen.expr
+98.4 GB
+1.92G	
+byte[]
+and 30 more...
+BinaryEventSender.processResponse
+Java | org.wso2.carbon.databridge.agent.endpoint.binary
+93.6 GB
+25M	
+byte[]
+and 1 more...
+RequestContext.setExecutionStatus
+Java | org.wso2.carbon.registry.core.jdbc.handlers
+93.2 GB
+3.07G	
+HashMap$Node
+and 4 more...
+Arrays.copyOfRange
+Built-In JRE | java.util
+92.7 GB
+1.88G	
+byte[]
+and 1 more...
+ConcurrentHashMap$KeySetView.iterator
+Built-In JRE | java.util.concurrent
+92.6 GB
+1.65G	
+ConcurrentHashMap$KeyIterator
+Factory.makeJP
+Java | org.aspectj.runtime.reflect
+83.5 GB
+3.02G	
+JoinPointImpl
+and 1 more...
+StringUTF16.compress
+Lang | java.lang
+78.9 GB
+1.7G	
+byte[]
+JSONValue.escape
+Java | org.json.simple
+78.6 GB
+407M	
+byte[]
+and 2 more...
+ThrottleHandler.validateCustomPolicy_aroundBody50
+Java | org.wso2.carbon.apimgt.gateway.handlers.throttling
+76 GB
+974M	
+int[]
+and 16 more...
+Integer.valueOf
+Lang | java.lang
+75.8 GB
+4.74G	
+Integer
+BinaryMessageConverterUtil.assignData
+Java | org.wso2.carbon.databridge.commons.binary
+73.6 GB
+38.5M	
+byte[]
+JSONValue.toJSONString
+Java | org.json.simple
+73.5 GB
+673M	
+byte[]
+and 2 more...
+ClassFileWriter.toByteArray
+Java | org.mozilla.classfile
+70.5 GB
+18.9M	
+byte[]
+IterableAttributeAxis.iterator
+Java | org.jaxen.expr.iter
+69.9 GB
+2.35G	
+Object[]
+and 5 more...
+PaxLoggerImpl.doLog0
+Java | org.ops4j.pax.logging.log4j2.internal
+69 GB
+85.5M	
+int[]
+and 1 more...
+CORSRequestHandler.handleResponse_aroundBody16
+Java | org.wso2.carbon.apimgt.gateway.handlers.security
+66.1 GB
+1.85G	
+byte[]
+and 10 more...
+Unsafe.allocateUninitializedArray
+Built-In JRE | jdk.internal.misc
+64.2 GB
+1.13G	
+byte[]
+TextBuffer.contentsAsString
+Java | com.ctc.wstx.util
+63 GB
+1.46G	
+byte[]
+and 2 more...
+HashMap.newNode
+Built-In JRE | java.util
+59.3 GB
+1.85G	
+HashMap$Node
+BufferingXmlWriter.flushBuffer
+Java | com.ctc.wstx.sw
+57.3 GB
+12.8M	
+byte[]
+Accessor.setCapacity
+Java | oracle.jdbc.driver
+52.3 GB
+5.28M	
+long[]
+and 3 more...
+BaseXPath.selectNodes
+Java | org.jaxen
+51.5 GB
+1.89G	
+Context
+and 4 more...
+API.canProcess
+Built-In Apache | org.apache.synapse.api
+51.1 GB
+491M	
+byte[]
+Codegen.getBodyMethodSignature
+Java | org.mozilla.javascript.optimizer
+50.5 GB
+420M	
+byte[]
+and 2 more...
+DataEndpoint.getClient
+Java | org.wso2.carbon.databridge.agent.endpoint
+49.4 GB
+1.55G	
+GenericKeyedObjectPool$Latch
+and 2 more...
+StringLatin1.toUpperCase
+Lang | java.lang
+48.9 GB
+1.73G	
+byte[]
+and 1 more...
+SubPathReference.startLocalPath
+Java | <agent>
+47.2 GB
+655M	
+SubPathReference
+RequestContext.getHandlerExecutionIdString
+Java | org.wso2.carbon.registry.core.jdbc.handlers
+46.2 GB
+2.18G	
+String
+and 2 more...
+IdentitySet.add
+Java | org.jaxen.expr
+45.9 GB
+1.52G	
+HashMap$Node
+and 2 more...
+ApiUtils.matchApiPath
+Built-In Apache | org.apache.synapse.api
+45.6 GB
+999M	
+byte[]
+CharArrayBuffer.substringTrimmed
+Built-In Apache | org.apache.http.util
+44.7 GB
+1.86G	
+String
+TimeoutBlockingWaitStrategy.waitFor
+Java | com.lmax.disruptor
+41.1 GB
+1.28G	
+AbstractQueuedSynchronizer$ConditionNode
+DefaultLocationPath.evaluate
+Java | org.jaxen.expr
+39.8 GB
+1.53G	
+Context
+and 4 more...
+CarbonDeploymentSchedulerTask.runAxisDeployment
+Java | org.wso2.carbon.core.deployment
+38.6 GB
+821M	
+byte[]
+and 5 more...
+StringLatin1.newString
+Lang | java.lang
+38.6 GB
+1.61G	
+String
+LogsHandler.handleResponseInFlow
+Java | com.fisglobal.apigw.apilogs
+38.4 GB
+549M	
+byte[]
+and 22 more...
+BinaryMessageConverterUtil.getSize
+Java | org.wso2.carbon.databridge.commons.binary
+37 GB
+25.4M	
+byte[]
+BigInteger.remainderKnuth
+Built-In JRE | java.math
+36.8 GB
+1.54G	
+MutableBigInteger
+MultitenantMessageReceiver.dispatchAndVerify
+Java | org.wso2.carbon.core.multitenancy
+36.5 GB
+635M	
+int[]
+and 20 more...
+HashMap.resize
+Built-In JRE | java.util
+35.6 GB
+341M	
+HashMap$Node[]
+LogUtils.getAPICtx
+Java | com.fisglobal.apigw.apilogs
+34.7 GB
+685M	
+boolean[]
+and 21 more...
+LogUtils.getAPIName
+Java | com.fisglobal.apigw.apilogs
+33.3 GB
+654M	
+boolean[]
+and 21 more...
+EmbeddedRegistry.getRegistryContext
+Java | org.wso2.carbon.registry.core.jdbc
+33.3 GB
+386M	
+RequestContext
+and 3 more...
+PaxContext.getCopyOfContextMap
+Java | org.ops4j.pax.logging
+33 GB
+879M	
+HashMap$Node
+and 3 more...
+DefiningClassLoader.defineClass
+Java | org.mozilla.javascript
+32.1 GB
+675M	
+byte[]
+and 8 more...
+LogUtils.getElectedResource
+Java | com.fisglobal.apigw.apilogs
+31.4 GB
+606M	
+boolean[]
+and 21 more...
+Codegen.createScriptObject
+Java | org.mozilla.javascript.optimizer
+31.2 GB
+977M	
+byte[]
+and 11 more...
+JSONTokener.nextString
+Java | org.json
+30.2 GB
+753M	
+byte[]
+and 2 more...
+ELKCounterMetric.incrementCount
+Java | org.wso2.am.analytics.publisher.reporter.elk
+30.1 GB
+250M	
+byte[]
+and 15 more...
+LogUtils.getApiTo
+Java | com.fisglobal.apigw.apilogs
+29.5 GB
+575M	
+boolean[]
+and 24 more...
+CorrelationNative.serializeLinkToDistributedTracingHeaders
+Java | <agent>
+29.5 GB
+365M	
+byte[]
+and 1 more...
+DefaultNameStep.evaluate
+Java | org.jaxen.expr
+28.7 GB
+889M	
+Object[]
+and 1 more...
+ArrayList.iterator
+Built-In JRE | java.util
+27.7 GB
+866M	
+ArrayList$Itr
+StringConcatHelper.newString
+Lang | java.lang
+26.3 GB
+1.09G	
+String
+ByteArrayOutputStream.<init>
+Built-In JRE | java.io
+25.8 GB
+258M	
+byte[]
+AbstractHttpMessage.addHeader
+Built-In Apache | org.apache.http.message
+25.3 GB
+1.06G	
+BasicHeader
+MultitenantMessageReceiver.copyProperties
+Java | org.wso2.carbon.core.multitenancy
+24.5 GB
+598M	
+HashMap$Node
+and 9 more...
+ReaderConfig.allocFullCBuffer
+Java | com.ctc.wstx.api
+24.4 GB
+4.94M	
+char[]
+IntegerPolynomial$MutableElement.fixed
+Built-In JRE | sun.security.util.math.intpoly
+23.4 GB
+420M	
+long[]
+and 1 more...
+TreeMap.addEntry
+Built-In JRE | java.util
+23.1 GB
+578M	
+TreeMap$Entry
+Pattern$BnM.optimize
+Built-In JRE | java.util.regex
+22.9 GB
+90.7M	
+int[]
+and 1 more...
+ThreadInfo.initialize
+Lang | java.lang.management
+22.8 GB
+950M	
+LockInfo
+AbstractMessageParser.parse
+Built-In Apache | org.apache.http.impl.nio.codecs
+22.6 GB
+942M	
+CharArrayBuffer
+ServiceRegistry.lookupServiceRegistrations
+Java | org.eclipse.osgi.internal.serviceregistry
+22.1 GB
+691M	
+LinkedList
+and 2 more...
+BasicLineParser.parseHeader
+Built-In Apache | org.apache.http.message
+21.9 GB
+914M	
+BufferedHeader
+MutableBigInteger.<init>
+Built-In JRE | java.math
+21.9 GB
+943M	
+int[]
+HmacCore.<init>
+Built-In JRE | com.sun.crypto.provider
+21.8 GB
+154M	
+byte[]
+ExponentiallyDecayingReservoir.update
+Java | com.codahale.metrics
+21.7 GB
+826M	
+WeightedSnapshot$WeightedSample
+and 3 more...
+DefaultExpr.convertToList
+Java | org.jaxen.expr
+21.6 GB
+901M	
+SingletonList
+UriTemplate.expand
+Java | com.damnhandy.uri.template
+21.6 GB
+251M	
+int[]
+and 12 more...
+BigInteger.shiftRightImpl
+Built-In JRE | java.math
+21.2 GB
+579M	
+BigInteger
+and 1 more...
+Pattern.compile
+Built-In JRE | java.util.regex
+21 GB
+272M	
+int[]
+and 4 more...
+DescendantAxisIterator.next
+Java | org.jaxen.util
+20.9 GB
+243M	
+byte[]
+and 19 more...
+JWTUtil.isJWTValid_aroundBody6
+Java | org.wso2.carbon.apimgt.impl.utils
+20.8 GB
+43.6M	
+byte[]
+and 5 more...
+TokenStream.getStringFromBuffer
+Java | org.mozilla.javascript
+20.7 GB
+843M	
+byte[]
+and 1 more...
+LinkedList.linkLast
+Built-In JRE | java.util
+20.4 GB
+850M	
+LinkedList$Node
+
+
+Memory breakdown
+Allocated memory ​325 GB
+Survived memory ​947 GB
