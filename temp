@@ -1,7 +1,33 @@
-grep -iE "cache.*invalid|cache.*clear|cache.*flush|cache.*evict|\
-script.*reload|rhino.*error|registry.*error|registry.*timeout|\
-deploy|undeploy|tenant.*load|outofmemory|hazelcast.*warn|\
-CarbonDeploymentScheduler" \
-  /opt/codeconnect/wso2am-4.2.0-gw/repository/logs/wso2carbon.log \
-  | grep "08:2" \
-  | sort
+
+High memory usage on host
+Health alert
+
+Alert settings
+Custom
+Alert condition
+Alert if metric is above all thresholds
+Memory usage thresholds
+Windows (%)
+90
+Unix (%)
+80
+Page fault thresholds
+Windows (faults/s)
+100
+Unix (faults/s)
+20
+
+Advanced options
+
+Violating samples
+
+18
+Violating sliding window
+
+30
+Dealerting samples
+
+30
+Dealerting sliding window
+
+30
