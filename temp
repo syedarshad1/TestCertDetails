@@ -1,33 +1,123 @@
+I am getting Memory resources exhausted alert
 
-High memory usage on host
-Health alert
+event.status
 
-Alert settings
-Custom
-Alert condition
-Alert if metric is above all thresholds
-Memory usage thresholds
-Windows (%)
-90
-Unix (%)
-80
-Page fault thresholds
-Windows (faults/s)
-100
-Unix (faults/s)
-20
+ACTIVE
 
-Advanced options
+event.start
 
-Violating samples
+Mar 25, 2026, 4:07 PM
 
-18
-Violating sliding window
+event.name
 
-30
-Dealerting samples
 
-30
-Dealerting sliding window
+Memory resources exhausted
 
-30
+event.description
+
+Memory exhausted on /opt/codeconnect/wso2am-4.2.0-gw/lib/tomcat
+
+event.category
+
+RESOURCE_CONTENTION
+
+event.type
+
+PROCESS_MEMORY_RESOURCE_EXHAUSTED
+
+event.group_label
+
+Memory resources exhausted
+
+dt.source_entity
+
+PROCESS_GROUP_INSTANCE-9DFC04016BC125C0
+
+dt.query
+
+timeseries exhausted_memory=avg(dt.runtime.jvm.memory.free) , by: { dt.entity.process_group_instance } , filter: { dt.entity.process_group_instance=="PROCESS_GROUP_INSTANCE-9DFC04016BC125C0"}
+
+App
+
+CodeConnect
+
+DataCenter
+
+LRK
+
+Env
+
+PROD
+
+Function
+
+APP
+
+License_APP_Name
+
+CodeConnect
+
+License_Count
+
+48
+
+OnboardDate
+
+2024-09-15
+
+RITM
+
+RITM24006399827
+
+Snow-Assignment-Group
+
+ServiceNowName
+
+Type
+
+Install
+
+affected_entity_ids
+
+PROCESS_GROUP_INSTANCE-9DFC04016BC125C0
+
+affected_entity_types
+
+dt.entity.process_group_instance
+
+dt.davis.impact_level
+
+Infrastructure
+
+dt.davis.is_frequent_event
+
+false
+
+dt.davis.is_rootcause_relevant
+
+true
+
+dt.davis.mute.status
+
+NOT_MUTED
+
+dt.davis.timeout
+
+10
+
+dt.entity.host
+
+HOST-F1905A2743B3C6F4
+
+dt.entity.host.name
+
+lrk1rcdcapiap11.prod.local
+
+dt.entity.host_group
+
+HOST_GROUP-20A27CFF8C30ACA3
+
+dt.entity.host_group.name
+
+LRK_PROD_CodeConnect_APP
+
