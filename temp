@@ -26,3 +26,4 @@ index=dih sourcetype IN ("prd_dih_xmlsvr_usage_logs","prd_dih_xng_usage_logs") I
 | eventstats values(EmailID) as AllEmails
 | eval AllEmails = mvjoin(AllEmails, ",")
 | table CertName CertExpiryDate daystoexpire TotalRequests_last7days SrcID RoutingType InboundURL CertHashCode sourcetype TeamName EmailID AllEmails
+| fields - AllEmails
