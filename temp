@@ -21,9 +21,8 @@ index=dih sourcetype IN ("prd_dih_xmlsvr_usage_logs","prd_dih_xng_usage_logs") I
 | lookup DIH_Companion_Contact_Details RoutingType AS RoutingType_lookup OUTPUT TeamName AS TeamName_rt EmailID AS EmailID_rt
 | lookup DIH_Companion_Contact_Details SrcID AS SrcID_lookup OUTPUT TeamName AS TeamName_src EmailID AS EmailID_src
 | eval TeamName = coalesce(TeamName_rt, TeamName_src, "Unknown"),
-       EmailID = coalesce(EmailID_rt, EmailID_src, "default@xyz.com")
+       EmailID = coalesce(EmailID_rt, EmailID_src, "syed.arshadali@fisglobal.com")
 | sort CertExpiryDate
 | eventstats values(EmailID) as AllEmails
 | eval AllEmails = mvjoin(AllEmails, ",")
 | table CertName CertExpiryDate daystoexpire TotalRequests_last7days SrcID RoutingType InboundURL CertHashCode sourcetype TeamName EmailID AllEmails
-| fields - AllEmails
