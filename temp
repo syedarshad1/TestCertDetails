@@ -1,7 +1,7 @@
 index=dih sourcetype IN ("prd_dih_xmlsvr_usage_logs","prd_dih_xng_usage_logs") InboundURL!="ih-prd.prod.local*"
 | eval RoutingType = mvindex(split(RoutingKey, "~"), 1),
        CertExpiryDateEpoch = strptime(CertExpiryDate, "%Y-%m-%d-%H:%M")
-| where CertExpiryDateEpoch >= now() - 2592000 
+| where CertExpiryDateEpoch >= now() - 604800 
     AND CertExpiryDateEpoch <= now() + 2592000
 | stats 
     count as TotalRequests_last7days
