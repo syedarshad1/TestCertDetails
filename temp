@@ -1,4 +1,36 @@
-wso2        2565       1  1 Mar24 ?        00:44:42 splunkd -p 8089 start
-wso2        2579    2565  0 Mar24 ?        00:00:04 [splunkd pid=2565] splunkd -p 8089 start [process-runner]
-root       22162       1  1 Mar24 ?        00:45:58 splunkd --under-systemd --systemd-delegate=yes -p 8089 _internal_launch_under_systemd
-root       22185   22162  0 Mar24 ?        00:00:04 [splunkd pid=22162] splunkd --under-systemd --systemd-delegate=yes -p 8089 _internal_launch_under_systemd [process-runner]
+index=dih sourcetype IN ("prd_dih_xmlsvr_usage_logs","prd_dih_xng_usage_logs") InboundURL!="ih-prd.prod.local*"
+| eval RoutingType = mvindex(split(RoutingKey, "~"), 1),
+       CertExpiryDateEpoch = strptime(CertExpiryDate, "%Y-%m-%d-%H:%M")
+| where CertExpiryDateEpoch >= now() - 604800 
+    AND CertExpiryDateEpoch <= now() + 2592000
+| stats 
+    count as TotalRequests_last7days
+    min(CertExpiryDateEpoch) as CertExpiryDateEpoch
+    values(CertHashCode) as CertHashCode
+    values(SrcID) as SrcID
+    values(RoutingID) as RoutingID
+    values(RoutingKey) as RoutingKey
+    values(RoutingType) as RoutingType
+    values(InboundURL) as InboundURL
+    values(sourcetype) as sourcetype
+    by CertName
+| eval CertExpiryDate = strftime(CertExpiryDateEpoch, "%Y-%m-%d %H:%M"),
+       daystoexpire = round((CertExpiryDateEpoch - now()) / 86400, 0),
+       RoutingType_lookup = mvindex(RoutingType, 0),
+       SrcID_lookup = mvindex(SrcID, 0)
+| lookup DIH_Companion_Contact_Details RoutingType AS RoutingType_lookup OUTPUT TeamName AS TeamName_rt EmailID AS EmailID_rt
+| lookup DIH_Companion_Contact_Details SrcID AS SrcID_lookup OUTPUT TeamName AS TeamName_src EmailID AS EmailID_src
+| eval TeamName = coalesce(TeamName_rt, TeamName_src, "Unknown"),
+       EmailID = coalesce(EmailID_rt, EmailID_src, "syed.arshadali@fisglobal.com")
+| sort CertExpiryDate
+| eventstats values(EmailID) as DL
+| eval DL = mvjoin(DL, ",")
+| table CertName CertExpiryDate daystoexpire TotalRequests_last7days SrcID RoutingType InboundURL CertHashCode sourcetype TeamName EmailID DL
+| sendemail to=DL
+    subject="DIH Certificate Expiry Alert"
+    message="The following certificates are expiring within -7 to +30 days. Please review and take action."
+    sendresults=true
+    format=csv
+    inline=true
+| fields - DL
+| table CertName CertExpiryDate daystoexpire TotalRequests_last7days SrcID RoutingType InboundURL CertHashCode sourcetype TeamName EmailID
