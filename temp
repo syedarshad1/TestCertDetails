@@ -1,9 +1,3 @@
-can you delete all and add new values
-
-|inputlookup DIH_Companion_Contact_Details.csv
-
-delete all
-
-Give me the query to add one by one
-
-EmailID	RoutingType	SrcID	TeamName
+| inputlookup DIH_Companion_Contact_Details.csv
+| where 1=0
+| outputlookup DIH_Companion_Contact_Details.csv
