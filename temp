@@ -1,4 +1,4 @@
-index=dih sourcetype IN ("prd_dih_xmlsvr_usage_logs","prd_dih_xng_usage_logs") InboundURL!="ih-prd.prod.local" InboundURL!="ih-prd.prod.local:443"
+index=dih sourcetype IN ("prd_dih_xmlsvr_usage_logs","prd_dih_xng_usage_logs") InboundURL!="ih-prd.prod.local*"
 | eval RoutingType = mvindex(split(RoutingKey, "~"), 1),
        CertExpiryDateEpoch = strptime(CertExpiryDate, "%Y-%m-%d-%H:%M")
 | where CertExpiryDateEpoch >= now() - 2592000 
@@ -23,4 +23,6 @@ index=dih sourcetype IN ("prd_dih_xmlsvr_usage_logs","prd_dih_xng_usage_logs") I
 | eval TeamName = coalesce(TeamName_rt, TeamName_src, "Unknown"),
        EmailID = coalesce(EmailID_rt, EmailID_src, "default@xyz.com")
 | sort CertExpiryDate
-| table CertName CertExpiryDate daystoexpire TotalRequests_last7days SrcID RoutingType InboundURL CertHashCode sourcetype TeamName EmailID
+| eventstats values(EmailID) as AllEmails
+| eval AllEmails = mvjoin(AllEmails, ",")
+| table CertName CertExpiryDate daystoexpire TotalRequests_last7days SrcID RoutingType InboundURL CertHashCode sourcetype TeamName EmailID AllEmails
