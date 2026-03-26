@@ -1,3 +1,9 @@
 | inputlookup DIH_Companion_Contact_Details.csv
 | where 1=0
 | outputlookup DIH_Companion_Contact_Details.csv
+
+
+| makeresults
+| eval EmailID="user1@xyz.com", RoutingType="TypeA", SrcID="SRC001", TeamName="Team Alpha"
+| table EmailID RoutingType SrcID TeamName
+| outputlookup append=true DIH_Companion_Contact_Details.csv
