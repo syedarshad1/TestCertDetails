@@ -18,6 +18,10 @@ index=dih sourcetype IN ("prd_dih_xmlsvr_usage_logs","prd_dih_xng_usage_logs") I
 | eval CertExpiryDate = strftime(CertExpiryDateEpoch, "%Y-%m-%d %H:%M")
 | eval daystoexpire = round((CertExpiryDateEpoch - now()) / 86400, 0)
 | eval RoutingType_lookup = mvindex(RoutingType, 0)
-| lookup DIH_Companion_Contact_Details RoutingType AS RoutingType_lookup OUTPUT TeamName EmailID
+| eval SrcID_lookup = mvindex(SrcID, 0)
+| lookup DIH_Companion_Contact_Details RoutingType AS RoutingType_lookup OUTPUT TeamName AS TeamName_rt EmailID AS EmailID_rt
+| lookup DIH_Companion_Contact_Details SrcID AS SrcID_lookup OUTPUT TeamName AS TeamName_src EmailID AS EmailID_src
+| eval TeamName = coalesce(TeamName_rt, TeamName_src, "Unknown")
+| eval EmailID = coalesce(EmailID_rt, EmailID_src, "default@xyz.com")
 | sort CertExpiryDate
 | table CertName CertExpiryDate daystoexpire TotalRequests_last7days SrcID RoutingType InboundURL CertHashCode sourcetype TeamName EmailID
