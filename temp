@@ -24,39 +24,3 @@ index=dih sourcetype IN ("prd_dih_xmlsvr_usage_logs","prd_dih_xng_usage_logs") I
        EmailID = coalesce(EmailID_rt, EmailID_src, "syed.arshadali@fisglobal.com")
 | sort CertExpiryDate
 | table CertName CertExpiryDate daystoexpire TotalRequests_last7days SrcID RoutingType InboundURL CertHashCode sourcetype TeamName EmailID
-| outputlookup dih_cert_expiry_temp.csv
-| sendemail to=[| inputlookup dih_cert_expiry_temp.csv | stats values(EmailID) as emails | eval emails=mvjoin(emails,",") | return $emails]
-    subject="DIH Certificate Expiry Alert"
-    message="Hello Everyone,
-
-This is an automated notification to inform you that one or more certificates used by DIH Gateway Users(FIS Internal App/External Clients) in the Production environment are expiring within the next 30 days.
-
-Certificates expiring soon require timely action to prevent authentication failures and service outages. Please coordinate with the appropriate teams and stakeholders to complete the renewal process.
-
-Required Actions
--------------------------------
-Please contact the respective Client/Bank/Bank Vendor/Internal FIS application and request renewal of the expiring certificate.
-
-Implementation Guidance
--------------------------------
-A. When the Root/Intermediate Certificate is NOT Changing
-   Proceed with the standard renewal process.Create a Change Request (CR). Assign an implementation task to the CTO Service Delivery team for deployment/add hash code.
-
-B. When the Root Certificate IS Changing, FIS must explicitly trust the new root certificate. The LOB Team must submit a Change Request to:
-	Akamizers Team / Load Balancer Team, and CTO Service Delivery
-
-This ensures the new trust chain is properly installed across all required components
-
-DIH Client Cert Dashboard
--------------------------------
-Splunk Dashboard to Check Client Certificate Expiry using CertificateName, HashCode and filter by application.
-
-https://es.fis-payments1.splunkcloud.com/en-US/app/dih/dih_client_cert_dashboard?form.time.earliest=-15m%40m&form.time.latest=now&form.tkn_sourcetype=sourcetype%3Dprd_dih_xmlsvr_usage_logs&form.s1&form.days_token=10
-
-=======================================================================================================================================================================================================
-The table included in this Alert contains the Certificate Name, Certificate Expiry Date, DIH Production URL (Client/Bank/Internal FIS apps).
-======================================================================================================================================================================================================="
-    sendresults=true
-    format=csv
-    inline=true
-    content_type=html
