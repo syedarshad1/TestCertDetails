@@ -1,9 +1,8 @@
-index=dih sourcetype IN ("prd_dih_xmlsvr_usage_logs","prd_dih_xng_usage_logs") InboundURL!="ih-prd.prod.local"
-| fields _raw SrcID RoutingID RoutingKey InboundURL sourcetype CertName CertExpiryDate CertHashCode
-| eval RoutingType = mvindex(split(RoutingKey, "~"), 1)
-| eval CertExpiryDateEpoch = strptime(CertExpiryDate, "%Y-%m-%d-%H:%M")
-| where CertExpiryDateEpoch >= now() - 30*86400 
-    AND CertExpiryDateEpoch <= now() + 30*86400
+index=dih sourcetype IN ("prd_dih_xmlsvr_usage_logs","prd_dih_xng_usage_logs") InboundURL!="ih-prd.prod.local" InboundURL!="ih-prd.prod.local:443"
+| eval RoutingType = mvindex(split(RoutingKey, "~"), 1),
+       CertExpiryDateEpoch = strptime(CertExpiryDate, "%Y-%m-%d-%H:%M")
+| where CertExpiryDateEpoch >= now() - 2592000 
+    AND CertExpiryDateEpoch <= now() + 2592000
 | stats 
     count as TotalRequests_last7days
     min(CertExpiryDateEpoch) as CertExpiryDateEpoch
@@ -15,13 +14,13 @@ index=dih sourcetype IN ("prd_dih_xmlsvr_usage_logs","prd_dih_xng_usage_logs") I
     values(InboundURL) as InboundURL
     values(sourcetype) as sourcetype
     by CertName
-| eval CertExpiryDate = strftime(CertExpiryDateEpoch, "%Y-%m-%d %H:%M")
-| eval daystoexpire = round((CertExpiryDateEpoch - now()) / 86400, 0)
-| eval RoutingType_lookup = mvindex(RoutingType, 0)
-| eval SrcID_lookup = mvindex(SrcID, 0)
+| eval CertExpiryDate = strftime(CertExpiryDateEpoch, "%Y-%m-%d %H:%M"),
+       daystoexpire = round((CertExpiryDateEpoch - now()) / 86400, 0),
+       RoutingType_lookup = mvindex(RoutingType, 0),
+       SrcID_lookup = mvindex(SrcID, 0)
 | lookup DIH_Companion_Contact_Details RoutingType AS RoutingType_lookup OUTPUT TeamName AS TeamName_rt EmailID AS EmailID_rt
 | lookup DIH_Companion_Contact_Details SrcID AS SrcID_lookup OUTPUT TeamName AS TeamName_src EmailID AS EmailID_src
-| eval TeamName = coalesce(TeamName_rt, TeamName_src, "Unknown")
-| eval EmailID = coalesce(EmailID_rt, EmailID_src, "default@xyz.com")
+| eval TeamName = coalesce(TeamName_rt, TeamName_src, "Unknown"),
+       EmailID = coalesce(EmailID_rt, EmailID_src, "default@xyz.com")
 | sort CertExpiryDate
 | table CertName CertExpiryDate daystoexpire TotalRequests_last7days SrcID RoutingType InboundURL CertHashCode sourcetype TeamName EmailID
