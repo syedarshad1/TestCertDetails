@@ -27,6 +27,19 @@ WITH blob_to_clob AS (
         AND r.reg_name = 'api'
     JOIN coct42_reg.reg_content c
         ON c.reg_content_id = r.reg_content_id
+),
+tag_positions AS (
+    SELECT 
+        b.*,
+        DBMS_LOB.INSTR(full_xml, '<endpointConfig>') AS ec_start,
+        DBMS_LOB.INSTR(full_xml, '</endpointConfig>') AS ec_end,
+        DBMS_LOB.INSTR(full_xml, '<inSequence>') AS is_start,
+        DBMS_LOB.INSTR(full_xml, '</inSequence>') AS is_end,
+        DBMS_LOB.INSTR(full_xml, '<outSequence>') AS os_start,
+        DBMS_LOB.INSTR(full_xml, '</outSequence>') AS os_end,
+        DBMS_LOB.INSTR(full_xml, '<faultSequence>') AS fs_start,
+        DBMS_LOB.INSTR(full_xml, '</faultSequence>') AS fs_end
+    FROM blob_to_clob b
 )
 SELECT 
     API_UUID,
@@ -37,25 +50,9 @@ SELECT
     reg_media_type,
     reg_path_value,
     reg_last_updated_time,
-    DBMS_LOB.SUBSTR(
-        full_xml,
-        DBMS_LOB.INSTR(full_xml, '</endpointConfig>') - DBMS_LOB.INSTR(full_xml, '<endpointConfig>') - LENGTH('<endpointConfig>'),
-        DBMS_LOB.INSTR(full_xml, '<endpointConfig>') + LENGTH('<endpointConfig>')
-    ) AS endpointConfig,
-    DBMS_LOB.SUBSTR(
-        full_xml,
-        DBMS_LOB.INSTR(full_xml, '</inSequence>') - DBMS_LOB.INSTR(full_xml, '<inSequence>') - LENGTH('<inSequence>'),
-        DBMS_LOB.INSTR(full_xml, '<inSequence>') + LENGTH('<inSequence>')
-    ) AS inSequence,
-    DBMS_LOB.SUBSTR(
-        full_xml,
-        DBMS_LOB.INSTR(full_xml, '</outSequence>') - DBMS_LOB.INSTR(full_xml, '<outSequence>') - LENGTH('<outSequence>'),
-        DBMS_LOB.INSTR(full_xml, '<outSequence>') + LENGTH('<outSequence>')
-    ) AS outSequence,
-    DBMS_LOB.SUBSTR(
-        full_xml,
-        DBMS_LOB.INSTR(full_xml, '</faultSequence>') - DBMS_LOB.INSTR(full_xml, '<faultSequence>') - LENGTH('<faultSequence>'),
-        DBMS_LOB.INSTR(full_xml, '<faultSequence>') + LENGTH('<faultSequence>')
-    ) AS faultSequence
-FROM blob_to_clob
+    CASE WHEN ec_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, ec_end - ec_start - 16, ec_start + 16) END AS endpointConfig,
+    CASE WHEN is_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, is_end - is_start - 12, is_start + 12) END AS inSequence,
+    CASE WHEN os_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, os_end - os_start - 13, os_start + 13) END AS outSequence,
+    CASE WHEN fs_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, fs_end - fs_start - 15, fs_start + 15) END AS faultSequence
+FROM tag_positions
 ORDER BY reg_last_updated_time DESC;
