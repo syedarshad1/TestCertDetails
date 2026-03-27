@@ -1,9 +1,5 @@
-first you are pulling config from below 
+Step 1:
 
-reg_name=api and reg_path_value
-/_system/governance/apimgt/applicationdata/apis/uuid/lastestversion
+First finding the unique API_UUID and Revisions_created from below table
 
-
-/_system/governance/apimgt/applicationdata/apis/uuid/lastestversion/in
-/_system/governance/apimgt/applicationdata/apis/uuid/lastestversion/out
-/_system/governance/apimgt/applicationdata/apis/uuid/lastestversion/fault
+SELECT * FROM COCT42_AM.AM_API
