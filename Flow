@@ -12,3 +12,20 @@ SELECT distinct(API_UUID) FROM COCT42_AM.AM_API ; -- 2249
 SELECT count(*) FROM COCT42_AM.AM_API ; -- 2249
 
 So do not need to filter anything here
+
+Step 3:
+
+Now you have unique API_UUID and its Revisions_created (always need to refer this in the flow)
+
+3.1 Now I need to look for each unique API_UUID and Revisions_created
+
+    /_system/governance/apimgt/applicationdata/apis/{API_UUID}/{Revisions_created}
+
+    SELECT   r.reg_content_id,  r.reg_uuid,  r.reg_name,  r.reg_media_type,  p.reg_path_value,  r.reg_last_updated_time
+    FROM coct42_reg.reg_resource r
+    JOIN coct42_reg.reg_path p
+      ON r.reg_path_id = p.reg_path_id
+    WHERE    p.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/{API_UUID}/{Revisions_created}%'
+     and r.reg_name = 'api'
+    ORDER BY r.reg_last_updated_time DESC;
+
