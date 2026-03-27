@@ -11,4 +11,9 @@ WHERE NOT EXISTS (
         THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID
         ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED
     END
-);
+)
+ORDER BY a.REVISIONS_CREATED;
+
+SELECT p.reg_path_value
+FROM coct42_reg.reg_path p
+WHERE p.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/' || '<paste_one_uuid_here>' || '%';
