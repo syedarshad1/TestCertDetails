@@ -47,4 +47,24 @@ SELECT
         XMLTYPE(
             UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)) ||
             UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001)) ||
-            UTL_RAW.CAST_TO_VARCHA
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 6001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 8001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 10001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 12001))
+        ),
+        '//faultSequence'
+    ) AS faultSequence
+FROM COCT42_AM.AM_API a
+JOIN coct42_reg.reg_path p
+    ON p.reg_path_value = CASE 
+        WHEN a.REVISIONS_CREATED = 0 
+        THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID
+        ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED
+    END
+JOIN coct42_reg.reg_resource r
+    ON r.reg_path_id = p.reg_path_id
+    AND r.reg_name = 'api'
+JOIN coct42_reg.reg_content c
+    ON c.reg_content_id = r.reg_content_id
+ORDER BY r.reg_last_updated_time DESC;
