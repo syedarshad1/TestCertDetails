@@ -1,1 +1,50 @@
-13596	2125	3462.859014911884319927699954812471757795
+SELECT 
+    a.API_UUID,
+    a.REVISIONS_CREATED,
+    r.reg_content_id,
+    r.reg_uuid,
+    r.reg_name,
+    r.reg_media_type,
+    p.reg_path_value,
+    r.reg_last_updated_time,
+    EXTRACTVALUE(
+        XMLTYPE(
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 6001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 8001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 10001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 12001))
+        ),
+        '//endpointConfig'
+    ) AS endpointConfig,
+    EXTRACTVALUE(
+        XMLTYPE(
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 6001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 8001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 10001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 12001))
+        ),
+        '//inSequence'
+    ) AS inSequence,
+    EXTRACTVALUE(
+        XMLTYPE(
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 6001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 8001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 10001)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 12001))
+        ),
+        '//outSequence'
+    ) AS outSequence,
+    EXTRACTVALUE(
+        XMLTYPE(
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1)) ||
+            UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001)) ||
+            UTL_RAW.CAST_TO_VARCHA
