@@ -3,3 +3,12 @@ Step 1:
 First finding the unique API_UUID and Revisions_created from below table
 
 SELECT * FROM COCT42_AM.AM_API
+
+Step 2:
+
+Any how we have unique API_UUID in table COCT42_AM.AM_API
+
+SELECT distinct(API_UUID) FROM COCT42_AM.AM_API ; -- 2249
+SELECT count(*) FROM COCT42_AM.AM_API ; -- 2249
+
+So do not need to filter anything here
