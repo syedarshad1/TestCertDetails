@@ -1,16 +1,1 @@
-SELECT 
-    MAX(DBMS_LOB.GETLENGTH(c.reg_content_data)) AS max_bytes,
-    MIN(DBMS_LOB.GETLENGTH(c.reg_content_data)) AS min_bytes,
-    AVG(DBMS_LOB.GETLENGTH(c.reg_content_data)) AS avg_bytes
-FROM COCT42_AM.AM_API a
-JOIN coct42_reg.reg_path p
-    ON p.reg_path_value = CASE 
-        WHEN a.REVISIONS_CREATED = 0 
-        THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID
-        ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED
-    END
-JOIN coct42_reg.reg_resource r
-    ON r.reg_path_id = p.reg_path_id
-    AND r.reg_name = 'api'
-JOIN coct42_reg.reg_content c
-    ON c.reg_content_id = r.reg_content_id;
+13596	2125	3462.859014911884319927699954812471757795
