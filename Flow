@@ -21,11 +21,41 @@ Now you have unique API_UUID and its Revisions_created (always need to refer thi
 
     /_system/governance/apimgt/applicationdata/apis/{API_UUID}/{Revisions_created}
 
-    SELECT   r.reg_content_id,  r.reg_uuid,  r.reg_name,  r.reg_media_type,  p.reg_path_value,  r.reg_last_updated_time
-    FROM coct42_reg.reg_resource r
-    JOIN coct42_reg.reg_path p
-      ON r.reg_path_id = p.reg_path_id
-    WHERE    p.reg_path_value LIKE '%/_system/governance/apimgt/applicationdata/apis/{API_UUID}/{Revisions_created}%'
-     and r.reg_name = 'api'
-    ORDER BY r.reg_last_updated_time DESC;
+SELECT 
+    a.API_UUID,
+    a.REVISIONS_CREATED,
+    r.reg_content_id,
+    r.reg_uuid,
+    r.reg_name,
+    r.reg_media_type,
+    p.reg_path_value,
+    r.reg_last_updated_time
+FROM COCT42_AM.AM_API a
+JOIN coct42_reg.reg_path p
+    ON p.reg_path_value = CASE 
+        WHEN a.REVISIONS_CREATED = 0 
+        THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID
+        ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED
+    END
+JOIN coct42_reg.reg_resource r
+    ON r.reg_path_id = p.reg_path_id
+    AND r.reg_name = 'api'
+ORDER BY r.reg_last_updated_time DESC; -- 2213
+
+Step 4:
+
+You have nunique reg_content_id (count:2213), Now I want to extract the each reg_content_id data (its blob data type)
+
+SELECT * FROM coct42_reg.reg_content c WHERE c.reg_content_id = 15705219;
+
+4.1 I want to extract content between this an xml tag <endpointConfig>{extract the data}</endpointConfig> and create a another colomn called "endpointConfig"
+
+<endpointConfig>{"endpoint_type":"http","sandbox_endpoints":{"template_not_supported":false,"config":null,"url":"http:\/\/dummyURL.com\/"},"production_endpoints":{"template_not_supported":false,"config":null,"url":"https:\/\/ih2-prd.prod.local\/xpressng\/plainrest\/payment\/api\/bankway\/ach\/v1"}}</endpointConfig>
+
+4.2 I want to extract content between this an xml tag <inSequence>{extract the data}</inSequence> and create a another colomn called "inSequence"
+4.3 I want to extract content between this an xml tag <outSequence>{extract the data}</outSequence> and create a another colomn called "outSequence"
+4.4 I want to extract content between this an xml tag <faultSequence>{extract the data}</faultSequence> and create a another colomn called "faultSequence"
+
+
+
 
