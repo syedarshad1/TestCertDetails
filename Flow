@@ -1,0 +1,9 @@
+first you are pulling config from below 
+
+reg_name=api and reg_path_value
+/_system/governance/apimgt/applicationdata/apis/uuid/lastestversion
+
+
+/_system/governance/apimgt/applicationdata/apis/uuid/lastestversion/in
+/_system/governance/apimgt/applicationdata/apis/uuid/lastestversion/out
+/_system/governance/apimgt/applicationdata/apis/uuid/lastestversion/fault
