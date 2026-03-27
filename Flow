@@ -56,6 +56,68 @@ SELECT * FROM coct42_reg.reg_content c WHERE c.reg_content_id = 15705219;
 4.3 I want to extract content between this an xml tag <outSequence>{extract the data}</outSequence> and create a another colomn called "outSequence"
 4.4 I want to extract content between this an xml tag <faultSequence>{extract the data}</faultSequence> and create a another colomn called "faultSequence"
 
+Query: -- 2213
+WITH blob_to_clob AS (
+    SELECT 
+        a.API_NAME,
+        a.API_UUID,
+        a.REVISIONS_CREATED,
+        r.reg_content_id,
+        r.reg_uuid,
+        r.reg_name,
+        r.reg_media_type,
+        p.reg_path_value,
+        r.reg_last_updated_time,
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 6001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 8001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 10001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 12001))) AS full_xml
+    FROM COCT42_AM.AM_API a
+    JOIN coct42_reg.reg_path p
+        ON p.reg_path_value = CASE 
+            WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED
+        END
+    JOIN coct42_reg.reg_resource r
+        ON r.reg_path_id = p.reg_path_id
+        AND r.reg_name = 'api'
+    JOIN coct42_reg.reg_content c
+        ON c.reg_content_id = r.reg_content_id
+),
+tag_positions AS (
+    SELECT 
+        b.*,
+        DBMS_LOB.INSTR(full_xml, '<endpointConfig>') AS ec_start,
+        DBMS_LOB.INSTR(full_xml, '</endpointConfig>') AS ec_end,
+        DBMS_LOB.INSTR(full_xml, '<inSequence>') AS is_start,
+        DBMS_LOB.INSTR(full_xml, '</inSequence>') AS is_end,
+        DBMS_LOB.INSTR(full_xml, '<outSequence>') AS os_start,
+        DBMS_LOB.INSTR(full_xml, '</outSequence>') AS os_end,
+        DBMS_LOB.INSTR(full_xml, '<faultSequence>') AS fs_start,
+        DBMS_LOB.INSTR(full_xml, '</faultSequence>') AS fs_end
+    FROM blob_to_clob b
+)
+SELECT 
+    API_NAME,
+    API_UUID,
+    REVISIONS_CREATED,
+    reg_content_id,
+    reg_uuid,
+    reg_name,
+    reg_media_type,
+    reg_path_value,
+    reg_last_updated_time,
+    CASE WHEN ec_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, ec_end - ec_start - 16, ec_start + 16) END AS endpointConfig,
+    CASE WHEN is_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, is_end - is_start - 12, is_start + 12) END AS inSequence,
+    CASE WHEN os_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, os_end - os_start - 13, os_start + 13) END AS outSequence,
+    CASE WHEN fs_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, fs_end - fs_start - 15, fs_start + 15) END AS faultSequence
+FROM tag_positions
+ORDER BY reg_last_updated_time DESC;
+
 
 
 
