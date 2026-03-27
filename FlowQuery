@@ -1,4 +1,45 @@
-ORA-01489: result of string concatenation is too long
-01489. 00000 -  "result of string concatenation is too long"
-*Cause:    String concatenation result is more than the maximum size.
-*Action:   Make sure that the result is less than the maximum size.
+WITH blob_to_clob AS (
+    SELECT 
+        a.API_UUID,
+        a.REVISIONS_CREATED,
+        r.reg_content_id,
+        r.reg_uuid,
+        r.reg_name,
+        r.reg_media_type,
+        p.reg_path_value,
+        r.reg_last_updated_time,
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 6001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 8001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 10001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 12001))) AS full_xml
+    FROM COCT42_AM.AM_API a
+    JOIN coct42_reg.reg_path p
+        ON p.reg_path_value = CASE 
+            WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED
+        END
+    JOIN coct42_reg.reg_resource r
+        ON r.reg_path_id = p.reg_path_id
+        AND r.reg_name = 'api'
+    JOIN coct42_reg.reg_content c
+        ON c.reg_content_id = r.reg_content_id
+)
+SELECT 
+    API_UUID,
+    REVISIONS_CREATED,
+    reg_content_id,
+    reg_uuid,
+    reg_name,
+    reg_media_type,
+    reg_path_value,
+    reg_last_updated_time,
+    EXTRACTVALUE(XMLTYPE(full_xml), '//endpointConfig') AS endpointConfig,
+    EXTRACTVALUE(XMLTYPE(full_xml), '//inSequence') AS inSequence,
+    EXTRACTVALUE(XMLTYPE(full_xml), '//outSequence') AS outSequence,
+    EXTRACTVALUE(XMLTYPE(full_xml), '//faultSequence') AS faultSequence
+FROM blob_to_clob
+ORDER BY reg_last_updated_time DESC;
