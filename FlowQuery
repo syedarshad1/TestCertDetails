@@ -1,10 +1,20 @@
-SELECT a.API_UUID, a.REVISIONS_CREATED
+SELECT 
+    a.API_UUID,
+    a.REVISIONS_CREATED,
+    r.reg_content_id,
+    r.reg_uuid,
+    r.reg_name,
+    r.reg_media_type,
+    p.reg_path_value,
+    r.reg_last_updated_time
 FROM COCT42_AM.AM_API a
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM coct42_reg.reg_path p
-    JOIN coct42_reg.reg_resource r
-        ON r.reg_path_id = p.reg_path_id
-        AND r.reg_name = 'api'
-    WHERE p.reg_path_value = '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED
-);
+JOIN coct42_reg.reg_path p
+    ON p.reg_path_value = CASE 
+        WHEN a.REVISIONS_CREATED = 0 
+        THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID
+        ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED
+    END
+JOIN coct42_reg.reg_resource r
+    ON r.reg_path_id = p.reg_path_id
+    AND r.reg_name = 'api'
+ORDER BY r.reg_last_updated_time DESC;
