@@ -1,1 +1,61 @@
-<metadata xmlns="http://www.wso2.org/governance/metadata"><overview><redirectURL></redirectURL><environments>Production and Sandbox</environments><apiExternalProductionEndpoint></apiExternalProductionEndpoint><authorizationHeader></authorizationHeader><type>HTTP</type><productionTps></productionTps><enableSchemaValidation>false</enableSchemaValidation><wsUriMapping>null</wsUriMapping><context>/api/drc/transaction-list/v1</context><sandboxTps></sandboxTps><versionType>context</versionType><thumbnail></thumbnail><audience></audience><advertiseOnly>false</advertiseOnly><visibility>restricted</visibility><outSequence></outSequence><businessOwnerEmail>GRPCoreDigitalDevelopment@fisglobal.com</businessOwnerEmail><version>v1</version><enableSubscriberVerification>false</enableSubscriberVerification><visibleTenants></visibleTenants><cacheTimeout>300</cacheTimeout><enableStore>true</enableStore><isDefaultVersion>false</isDefaultVersion><asyncTransportProtocols></asyncTransportProtocols><gatewayVendor>wso2</gatewayVendor><websubSubscriptionConfiguration>null</websubSubscriptionConfiguration><name>DRC-TransactionList</name><endpointUsername></endpointUsername><responseCaching>Disabled</responseCaching><apiSecurity>oauth2,oauth_basic_auth_api_key_mandatory</apiSecurity><status>PUBLISHED</status><contextTemplate>/api/drc/transaction-list/{version}</contextTemplate><description>This DRC API is used to return list of transactions within a claim.</description><technicalOwner>GRPCoreDigitalDevelopment</technicalOwner><visibleRoles>Internal/internal-user,Internal/grp-user,Internal/internal-user</visibleRoles><corsConfiguration>{"corsConfigurationEnabled":true,"accessControlAllowOrigins":["*"],"accessControlAllowCredentials":false,"accessControlAllowHeaders":["Authorization","Access-Control-Allow-Origin","Content-Type","SOAPAction","Access-Control-Allow-Options","Access-Control-Allow-Headers","Access-Control-Allow-Methods","uuid"],"accessControlAllowMethods":["GET","PUT","POST","DELETE","PATCH","OPTIONS"]}</corsConfiguration><faultSequence></faultSequence><wsdl></wsdl><subscriptionAvailability>current_tenant</subscriptionAvailability><isLatest>true</isLatest><tier>Unlimited</tier><provider>api-bot</provider><endpointConfig>{"endpoint_type":"http","sandbox_endpoints":{"template_not_supported":false,"url":"https:\/\/digital-ic.prod.local\/xpressNg\/rest\/digital\/payment\/drc\/transaction-list\/v1"},"production_endpoints":{"template_not_supported":false,"url":"https:\/\/digital-ic.prod.local\/xpressNg\/rest\/digital\/payment\/drc\/transaction-list\/v1"}}</endpointConfig><vendor></vendor><inSequence></inSequence><testKey></testKey><endpointSecured>false</endpointSecured><endpointAuthDigest>false</endpointAuthDigest><tenants></tenants><endpointPpassword></endpointPpassword><versionComparable>1754687154050</versionComparable><wadl></wadl><technicalOwnerEmail>GRPCoreDigitalDevelopment@fisglobal.com</technicalOwnerEmail><implementation>ENDPOINT</implementation><apiOwner></apiOwner><transports>https</transports><deployments>null</deployments><apiExternalSandboxEndpoint></apiExternalSandboxEndpoint><keyManagers>["all"]</keyManagers><businessOwner>GRPCoreDigitalDevelopment</businessOwner></overview><monetizationProperties>{}</monetizationProperties><isMonetizationEnabled>false</isMonetizationEnabled></metadata>
+WITH blob_to_clob AS (
+    SELECT 
+        a.API_UUID,
+        a.REVISIONS_CREATED,
+        r.reg_content_id,
+        r.reg_uuid,
+        r.reg_name,
+        r.reg_media_type,
+        p.reg_path_value,
+        r.reg_last_updated_time,
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 6001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 8001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 10001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 12001))) AS full_xml
+    FROM COCT42_AM.AM_API a
+    JOIN coct42_reg.reg_path p
+        ON p.reg_path_value = CASE 
+            WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED
+        END
+    JOIN coct42_reg.reg_resource r
+        ON r.reg_path_id = p.reg_path_id
+        AND r.reg_name = 'api'
+    JOIN coct42_reg.reg_content c
+        ON c.reg_content_id = r.reg_content_id
+)
+SELECT 
+    API_UUID,
+    REVISIONS_CREATED,
+    reg_content_id,
+    reg_uuid,
+    reg_name,
+    reg_media_type,
+    reg_path_value,
+    reg_last_updated_time,
+    DBMS_LOB.SUBSTR(
+        full_xml,
+        DBMS_LOB.INSTR(full_xml, '</endpointConfig>') - DBMS_LOB.INSTR(full_xml, '<endpointConfig>') - LENGTH('<endpointConfig>'),
+        DBMS_LOB.INSTR(full_xml, '<endpointConfig>') + LENGTH('<endpointConfig>')
+    ) AS endpointConfig,
+    DBMS_LOB.SUBSTR(
+        full_xml,
+        DBMS_LOB.INSTR(full_xml, '</inSequence>') - DBMS_LOB.INSTR(full_xml, '<inSequence>') - LENGTH('<inSequence>'),
+        DBMS_LOB.INSTR(full_xml, '<inSequence>') + LENGTH('<inSequence>')
+    ) AS inSequence,
+    DBMS_LOB.SUBSTR(
+        full_xml,
+        DBMS_LOB.INSTR(full_xml, '</outSequence>') - DBMS_LOB.INSTR(full_xml, '<outSequence>') - LENGTH('<outSequence>'),
+        DBMS_LOB.INSTR(full_xml, '<outSequence>') + LENGTH('<outSequence>')
+    ) AS outSequence,
+    DBMS_LOB.SUBSTR(
+        full_xml,
+        DBMS_LOB.INSTR(full_xml, '</faultSequence>') - DBMS_LOB.INSTR(full_xml, '<faultSequence>') - LENGTH('<faultSequence>'),
+        DBMS_LOB.INSTR(full_xml, '<faultSequence>') + LENGTH('<faultSequence>')
+    ) AS faultSequence
+FROM blob_to_clob
+ORDER BY reg_last_updated_time DESC;
