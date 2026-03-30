@@ -67,45 +67,34 @@ extracted AS (
         END AS faultSequence
     FROM tag_positions
 ),
--- First get matching resources WITHOUT reading BLOBs
-seq_resource_ranked AS (
+-- Step 5: Lightweight lookup - just get reg_content_id by sequence name, pick latest
+seq_ref AS (
     SELECT 
-        r_s.reg_name AS seq_reg_name,
+        CASE 
+            WHEN r_s.reg_name LIKE '%.xml' 
+            THEN SUBSTR(r_s.reg_name, 1, LENGTH(r_s.reg_name) - 4)
+            ELSE r_s.reg_name
+        END AS seq_name_clean,
         r_s.reg_content_id AS seq_content_id,
-        r_s.reg_media_type AS seq_media_type,
-        p_s.reg_path_value AS seq_path,
-        r_s.reg_last_updated_time AS seq_last_updated,
         ROW_NUMBER() OVER (
-            PARTITION BY r_s.reg_name
+            PARTITION BY 
+                CASE 
+                    WHEN r_s.reg_name LIKE '%.xml' 
+                    THEN SUBSTR(r_s.reg_name, 1, LENGTH(r_s.reg_name) - 4)
+                    ELSE r_s.reg_name
+                END
             ORDER BY r_s.reg_last_updated_time DESC
         ) AS rn
     FROM coct42_reg.reg_resource r_s
-    JOIN coct42_reg.reg_path p_s
-        ON r_s.reg_path_id = p_s.reg_path_id
-    WHERE p_s.reg_path_value LIKE '/_system/governance/apimgt/customsequences/%'
-      AND r_s.reg_media_type IN (
-          'application/vnd.wso2.sequence',
-          'application/xml'
-      )
+    WHERE r_s.reg_media_type IN (
+        'application/vnd.wso2.sequence',
+        'application/xml'
+    )
 ),
--- Dedup first, THEN read BLOBs only for winners
-seq_lookup AS (
-    SELECT 
-        sr.seq_reg_name,
-        sr.seq_content_id,
-        sr.seq_media_type,
-        sr.seq_path,
-        sr.seq_last_updated,
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_s.reg_content_data, 2000, 1))) ||
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_s.reg_content_data, 2000, 2001))) ||
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_s.reg_content_data, 2000, 4001))) ||
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_s.reg_content_data, 2000, 6001))) ||
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_s.reg_content_data, 2000, 8001))) ||
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_s.reg_content_data, 2000, 10001))) AS seq_content
-    FROM seq_resource_ranked sr
-    JOIN coct42_reg.reg_content c_s
-        ON c_s.reg_content_id = sr.seq_content_id
-    WHERE sr.rn = 1
+seq_latest AS (
+    SELECT seq_name_clean, seq_content_id
+    FROM seq_ref
+    WHERE rn = 1
 )
 SELECT 
     e.API_NAME,
@@ -121,8 +110,13 @@ SELECT
     
     e.inSequence AS inSequence_name,
     CASE 
-        WHEN e.inSequence IS NOT NULL AND isl.seq_content IS NOT NULL 
-            THEN isl.seq_content
+        WHEN e.inSequence IS NOT NULL AND isl.seq_content_id IS NOT NULL 
+            THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 1))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 2001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 4001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 6001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 8001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 10001)))
         WHEN e.inSequence IS NOT NULL 
             THEN TO_CLOB('NOT FOUND')
         ELSE TO_CLOB(NULL)
@@ -130,8 +124,13 @@ SELECT
     
     e.outSequence AS outSequence_name,
     CASE 
-        WHEN e.outSequence IS NOT NULL AND osl.seq_content IS NOT NULL 
-            THEN osl.seq_content
+        WHEN e.outSequence IS NOT NULL AND osl.seq_content_id IS NOT NULL 
+            THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 1))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 2001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 4001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 6001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 8001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 10001)))
         WHEN e.outSequence IS NOT NULL 
             THEN TO_CLOB('NOT FOUND')
         ELSE TO_CLOB(NULL)
@@ -139,18 +138,29 @@ SELECT
     
     e.faultSequence AS faultSequence_name,
     CASE 
-        WHEN e.faultSequence IS NOT NULL AND fsl.seq_content IS NOT NULL 
-            THEN fsl.seq_content
+        WHEN e.faultSequence IS NOT NULL AND fsl.seq_content_id IS NOT NULL 
+            THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 1))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 2001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 4001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 6001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 8001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 10001)))
         WHEN e.faultSequence IS NOT NULL 
             THEN TO_CLOB('NOT FOUND')
         ELSE TO_CLOB(NULL)
     END AS faultSequence_content
 
 FROM extracted e
-LEFT JOIN seq_lookup isl
-    ON isl.seq_reg_name LIKE e.inSequence || '%'
-LEFT JOIN seq_lookup osl
-    ON osl.seq_reg_name LIKE e.outSequence || '%'
-LEFT JOIN seq_lookup fsl
-    ON fsl.seq_reg_name LIKE e.faultSequence || '%'
+LEFT JOIN seq_latest isl
+    ON isl.seq_name_clean = e.inSequence
+LEFT JOIN coct42_reg.reg_content c_in
+    ON c_in.reg_content_id = isl.seq_content_id
+LEFT JOIN seq_latest osl
+    ON osl.seq_name_clean = e.outSequence
+LEFT JOIN coct42_reg.reg_content c_out
+    ON c_out.reg_content_id = osl.seq_content_id
+LEFT JOIN seq_latest fsl
+    ON fsl.seq_name_clean = e.faultSequence
+LEFT JOIN coct42_reg.reg_content c_flt
+    ON c_flt.reg_content_id = fsl.seq_content_id
 ORDER BY e.reg_last_updated_time DESC;
