@@ -40,11 +40,11 @@ JOIN coct42_reg.reg_path p
 JOIN coct42_reg.reg_resource r
     ON r.reg_path_id = p.reg_path_id
     AND r.reg_name = 'api'
-ORDER BY r.reg_last_updated_time DESC; -- 2213
+ORDER BY r.reg_last_updated_time DESC; -- 2216
 
 Step 4:
 
-You have nunique reg_content_id (count:2213), Now I want to extract the each reg_content_id data (its blob data type)
+You have nunique reg_content_id (count:2216), Now I want to extract the each reg_content_id data (its blob data type)
 
 SELECT * FROM coct42_reg.reg_content c WHERE c.reg_content_id = 15705219;
 
@@ -116,7 +116,7 @@ SELECT
     CASE WHEN os_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, os_end - os_start - 13, os_start + 13) END AS outSequence,
     CASE WHEN fs_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, fs_end - fs_start - 15, fs_start + 15) END AS faultSequence
 FROM tag_positions
-ORDER BY reg_last_updated_time DESC;
+ORDER BY reg_last_updated_time DESC; -- 2216
 
 Step 5:
 
