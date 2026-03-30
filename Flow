@@ -118,6 +118,19 @@ SELECT
 FROM tag_positions
 ORDER BY reg_last_updated_time DESC;
 
+Step 5:
+
+now you are checking only with below 2 condition right?
+
+reg_path_value = "/_system/governance/apimgt/applicationdata/apis/{API_UUID}/{Revisions_created}" and r.reg_name = 'api'
+
+Now I want is reg_path_value as below and reg_media_type = "application/xml", in not all cases we will have in/out/fault path value, get the reg_content_id for each and get the respestive clob data in column like insequence_reg_path (insequence_reg_path should have its blob data, similarly for other )
+here we don't know reg_name its dynamic, so use the last Revisions_created version and get the reg_content_id for /in,/out,/fault
+
+/_system/governance/apimgt/applicationdata/apis/{API_UUID}/{Revisions_created}/in and  reg_media_type = "application/xml"
+/_system/governance/apimgt/applicationdata/apis/{API_UUID}/{Revisions_created}/out and reg_media_type = "application/xml"
+/_system/governance/apimgt/applicationdata/apis/{API_UUID}/{Revisions_created}/fault and reg_media_type = "application/xml"
+
 
 
 
