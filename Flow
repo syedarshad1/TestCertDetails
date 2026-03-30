@@ -120,7 +120,7 @@ ORDER BY reg_last_updated_time DESC;
 
 Step 5:
 
-If you find the inSequence/outSequence/faultSequence, I want to see the content of sequence file using reg_content_id, which is blob data gain 
+If you find the inSequence/outSequence/faultSequence, I want to see the content of sequence file using reg_content_id, which is blob data again in insequence column itself, then just file name.
 
 SELECT 
   r.reg_content_id,
