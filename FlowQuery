@@ -67,14 +67,13 @@ extracted AS (
         END AS faultSequence
     FROM tag_positions
 ),
-seq_lookup AS (
+seq_lookup_all AS (
     SELECT 
-        CASE 
-            WHEN r_s.reg_name LIKE '%.xml' 
-            THEN SUBSTR(r_s.reg_name, 1, LENGTH(r_s.reg_name) - 4)
-            ELSE r_s.reg_name
-        END AS seq_name,
+        r_s.reg_name AS seq_reg_name,
         r_s.reg_content_id AS seq_content_id,
+        r_s.reg_media_type AS seq_media_type,
+        p_s.reg_path_value AS seq_path,
+        r_s.reg_last_updated_time AS seq_last_updated,
         TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_s.reg_content_data, 2000, 1))) ||
         TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_s.reg_content_data, 2000, 2001))) ||
         TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_s.reg_content_data, 2000, 4001))) ||
@@ -86,7 +85,29 @@ seq_lookup AS (
         ON r_s.reg_path_id = p_s.reg_path_id
     JOIN coct42_reg.reg_content c_s
         ON c_s.reg_content_id = r_s.reg_content_id
-    WHERE p_s.reg_path_value LIKE '/_system/governance/apimgt/customsequences/%'
+    WHERE r_s.reg_media_type IN (
+        'application/vnd.wso2.sequence',
+        'application/xml'
+    )
+),
+seq_lookup_ranked AS (
+    SELECT 
+        seq_reg_name,
+        seq_content_id,
+        seq_media_type,
+        seq_path,
+        seq_last_updated,
+        seq_content,
+        ROW_NUMBER() OVER (
+            PARTITION BY seq_reg_name
+            ORDER BY seq_last_updated DESC
+        ) AS rn
+    FROM seq_lookup_all
+),
+seq_lookup AS (
+    SELECT seq_reg_name, seq_content_id, seq_media_type, seq_path, seq_last_updated, seq_content
+    FROM seq_lookup_ranked
+    WHERE rn = 1
 )
 SELECT 
     e.API_NAME,
@@ -129,9 +150,9 @@ SELECT
 
 FROM extracted e
 LEFT JOIN seq_lookup isl
-    ON isl.seq_name = e.inSequence
+    ON isl.seq_reg_name LIKE e.inSequence || '%'
 LEFT JOIN seq_lookup osl
-    ON osl.seq_name = e.outSequence
+    ON osl.seq_reg_name LIKE e.outSequence || '%'
 LEFT JOIN seq_lookup fsl
-    ON fsl.seq_name = e.faultSequence
+    ON fsl.seq_reg_name LIKE e.faultSequence || '%'
 ORDER BY e.reg_last_updated_time DESC;
