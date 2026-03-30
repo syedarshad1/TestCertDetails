@@ -71,7 +71,7 @@ SELECT
     e.inSequence,
     e.outSequence,
     e.faultSequence,
-    -- inSequence file content by reg_name
+    -- inSequence file content
     CASE 
         WHEN e.inSequence IS NULL OR e.inSequence = '' THEN TO_CLOB('NOT FOUND')
         WHEN c_in.reg_content_data IS NULL THEN TO_CLOB('NOT FOUND')
@@ -84,7 +84,7 @@ SELECT
             TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 10001))) ||
             TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 12001)))
     END AS insequence_reg_data,
-    -- outSequence file content by reg_name
+    -- outSequence file content
     CASE 
         WHEN e.outSequence IS NULL OR e.outSequence = '' THEN TO_CLOB('NOT FOUND')
         WHEN c_out.reg_content_data IS NULL THEN TO_CLOB('NOT FOUND')
@@ -97,7 +97,7 @@ SELECT
             TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 10001))) ||
             TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 12001)))
     END AS outsequence_reg_data,
-    -- faultSequence file content by reg_name
+    -- faultSequence file content
     CASE 
         WHEN e.faultSequence IS NULL OR e.faultSequence = '' THEN TO_CLOB('NOT FOUND')
         WHEN c_fault.reg_content_data IS NULL THEN TO_CLOB('NOT FOUND')
@@ -111,22 +111,25 @@ SELECT
             TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fault.reg_content_data, 2000, 12001)))
     END AS faultsequence_reg_data
 FROM extracted e
--- Search inSequence by name
+-- Search inSequence by name using LIKE
 LEFT JOIN coct42_reg.reg_resource r_in
-    ON r_in.reg_name = e.inSequence
-    AND r_in.reg_media_type = 'application/xml'
+    ON r_in.reg_name LIKE '%' || e.inSequence || '%'
+    AND e.inSequence IS NOT NULL
+    AND e.inSequence != ''
 LEFT JOIN coct42_reg.reg_content c_in
     ON c_in.reg_content_id = r_in.reg_content_id
--- Search outSequence by name
+-- Search outSequence by name using LIKE
 LEFT JOIN coct42_reg.reg_resource r_out
-    ON r_out.reg_name = e.outSequence
-    AND r_out.reg_media_type = 'application/xml'
+    ON r_out.reg_name LIKE '%' || e.outSequence || '%'
+    AND e.outSequence IS NOT NULL
+    AND e.outSequence != ''
 LEFT JOIN coct42_reg.reg_content c_out
     ON c_out.reg_content_id = r_out.reg_content_id
--- Search faultSequence by name
+-- Search faultSequence by name using LIKE
 LEFT JOIN coct42_reg.reg_resource r_fault
-    ON r_fault.reg_name = e.faultSequence
-    AND r_fault.reg_media_type = 'application/xml'
+    ON r_fault.reg_name LIKE '%' || e.faultSequence || '%'
+    AND e.faultSequence IS NOT NULL
+    AND e.faultSequence != ''
 LEFT JOIN coct42_reg.reg_content c_fault
     ON c_fault.reg_content_id = r_fault.reg_content_id
 ORDER BY e.reg_last_updated_time DESC;
