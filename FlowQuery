@@ -1,1 +1,170 @@
-TD-Transaction-Processing	1d37b1b4-5e88-4b90-83e5-98103885e903	1	15729393	/_system/governance/apimgt/applicationdata/apis/1d37b1b4-5e88-4b90-83e5-98103885e903/1	08-AUG-25 03.26.22.515000000 PM	{"endpoint_type":"default","sandbox_endpoints":{"url":"default"},"production_endpoints":{"url":"default"}}	soap_endpoint_seq_rbc_in	soap_endpoint_seq_rbc_out		NOT FOUND	NOT FOUND	NOT FOUND
+-- Step 5: Resolve sequence names to their actual content from registry
+WITH blob_to_clob AS (
+    SELECT 
+        a.API_NAME,
+        a.API_UUID,
+        a.REVISIONS_CREATED,
+        r.reg_content_id,
+        r.reg_uuid,
+        r.reg_name,
+        r.reg_media_type,
+        p.reg_path_value,
+        r.reg_last_updated_time,
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 6001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 8001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 10001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 12001))) AS full_xml
+    FROM COCT42_AM.AM_API a
+    JOIN coct42_reg.reg_path p
+        ON p.reg_path_value = CASE 
+            WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED
+        END
+    JOIN coct42_reg.reg_resource r
+        ON r.reg_path_id = p.reg_path_id
+        AND r.reg_name = 'api'
+    JOIN coct42_reg.reg_content c
+        ON c.reg_content_id = r.reg_content_id
+),
+tag_positions AS (
+    SELECT 
+        b.*,
+        DBMS_LOB.INSTR(full_xml, '<endpointConfig>') AS ec_start,
+        DBMS_LOB.INSTR(full_xml, '</endpointConfig>') AS ec_end,
+        DBMS_LOB.INSTR(full_xml, '<inSequence>') AS is_start,
+        DBMS_LOB.INSTR(full_xml, '</inSequence>') AS is_end,
+        DBMS_LOB.INSTR(full_xml, '<outSequence>') AS os_start,
+        DBMS_LOB.INSTR(full_xml, '</outSequence>') AS os_end,
+        DBMS_LOB.INSTR(full_xml, '<faultSequence>') AS fs_start,
+        DBMS_LOB.INSTR(full_xml, '</faultSequence>') AS fs_end
+    FROM blob_to_clob b
+),
+extracted AS (
+    SELECT 
+        API_NAME,
+        API_UUID,
+        REVISIONS_CREATED,
+        reg_content_id,
+        reg_uuid,
+        reg_name,
+        reg_media_type,
+        reg_path_value,
+        reg_last_updated_time,
+        CASE WHEN ec_start > 0 
+             THEN DBMS_LOB.SUBSTR(full_xml, ec_end - ec_start - 16, ec_start + 16) 
+        END AS endpointConfig,
+        CASE WHEN is_start > 0 
+             THEN DBMS_LOB.SUBSTR(full_xml, is_end - is_start - 12, is_start + 12) 
+        END AS inSequence,
+        CASE WHEN os_start > 0 
+             THEN DBMS_LOB.SUBSTR(full_xml, os_end - os_start - 13, os_start + 13) 
+        END AS outSequence,
+        CASE WHEN fs_start > 0 
+             THEN DBMS_LOB.SUBSTR(full_xml, fs_end - fs_start - 15, fs_start + 15) 
+        END AS faultSequence
+    FROM tag_positions
+),
+-- Step 5: Resolve each sequence name to its registry content
+-- Lookup inSequence name in registry
+in_seq_lookup AS (
+    SELECT 
+        r_in.reg_name AS in_seq_name,
+        r_in.reg_content_id AS in_seq_content_id,
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 1))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 2001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 4001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 6001))) AS in_seq_content
+    FROM coct42_reg.reg_resource r_in
+    JOIN coct42_reg.reg_path p_in
+        ON r_in.reg_path_id = p_in.reg_path_id
+    JOIN coct42_reg.reg_content c_in
+        ON c_in.reg_content_id = r_in.reg_content_id
+    WHERE p_in.reg_path_value LIKE '/_system/governance/apimgt/customsequences/%'
+),
+-- Lookup outSequence name in registry
+out_seq_lookup AS (
+    SELECT 
+        r_out.reg_name AS out_seq_name,
+        r_out.reg_content_id AS out_seq_content_id,
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 1))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 2001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 4001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 6001))) AS out_seq_content
+    FROM coct42_reg.reg_resource r_out
+    JOIN coct42_reg.reg_path p_out
+        ON r_out.reg_path_id = p_out.reg_path_id
+    JOIN coct42_reg.reg_content c_out
+        ON c_out.reg_content_id = r_out.reg_content_id
+    WHERE p_out.reg_path_value LIKE '/_system/governance/apimgt/customsequences/%'
+),
+-- Lookup faultSequence name in registry
+fault_seq_lookup AS (
+    SELECT 
+        r_fs.reg_name AS fault_seq_name,
+        r_fs.reg_content_id AS fault_seq_content_id,
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fs.reg_content_data, 2000, 1))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fs.reg_content_data, 2000, 2001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fs.reg_content_data, 2000, 4001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fs.reg_content_data, 2000, 6001))) AS fault_seq_content
+    FROM coct42_reg.reg_resource r_fs
+    JOIN coct42_reg.reg_path p_fs
+        ON r_fs.reg_path_id = p_fs.reg_path_id
+    JOIN coct42_reg.reg_content c_fs
+        ON c_fs.reg_content_id = r_fs.reg_content_id
+    WHERE p_fs.reg_path_value LIKE '/_system/governance/apimgt/customsequences/%'
+)
+-- Final output: join extracted sequences to their resolved content
+SELECT 
+    e.API_NAME,
+    e.API_UUID,
+    e.REVISIONS_CREATED,
+    e.reg_content_id,
+    e.reg_uuid,
+    e.reg_name,
+    e.reg_media_type,
+    e.reg_path_value,
+    e.reg_last_updated_time,
+    e.endpointConfig,
+    
+    -- inSequence: show content if found, else sequence name, else NULL
+    e.inSequence AS inSequence_name,
+    CASE 
+        WHEN e.inSequence IS NOT NULL AND isl.in_seq_content IS NOT NULL 
+            THEN isl.in_seq_content
+        WHEN e.inSequence IS NOT NULL 
+            THEN 'NOT FOUND'
+        ELSE NULL
+    END AS inSequence_content,
+    
+    -- outSequence: show content if found, else sequence name, else NULL
+    e.outSequence AS outSequence_name,
+    CASE 
+        WHEN e.outSequence IS NOT NULL AND osl.out_seq_content IS NOT NULL 
+            THEN osl.out_seq_content
+        WHEN e.outSequence IS NOT NULL 
+            THEN 'NOT FOUND'
+        ELSE NULL
+    END AS outSequence_content,
+    
+    -- faultSequence: show content if found, else sequence name, else NULL
+    e.faultSequence AS faultSequence_name,
+    CASE 
+        WHEN e.faultSequence IS NOT NULL AND fsl.fault_seq_content IS NOT NULL 
+            THEN fsl.fault_seq_content
+        WHEN e.faultSequence IS NOT NULL 
+            THEN 'NOT FOUND'
+        ELSE NULL
+    END AS faultSequence_content
+
+FROM extracted e
+LEFT JOIN in_seq_lookup isl
+    ON isl.in_seq_name = e.inSequence
+LEFT JOIN out_seq_lookup osl
+    ON osl.out_seq_name = e.outSequence
+LEFT JOIN fault_seq_lookup fsl
+    ON fsl.fault_seq_name = e.faultSequence
+ORDER BY e.reg_last_updated_time DESC;
