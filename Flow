@@ -309,4 +309,14 @@ LEFT JOIN coct42_reg.reg_content c_flt
 ORDER BY e.reg_last_updated_time DESC; -- 2216
 
 
+Step 6:
 
+Now I want to add more logic here
+
+Now I want is reg_path_value as below and reg_media_type IN ("application/xml","application/vnd.wso2.sequence"), in not all cases we will have in/out/fault path value, get the reg_content_id for each and get the respestive clob data in column like insequence_reg_path (insequence_reg_path should have its blob data, similarly for other )
+
+here we don't know reg_name its dynamic, so use the last Revisions_created version and get the reg_content_id for /in,/out,/fault
+
+/_system/governance/apimgt/applicationdata/apis/{API_UUID}/{Revisions_created}/in and  reg_media_type IN ("application/xml","application/vnd.wso2.sequence")
+/_system/governance/apimgt/applicationdata/apis/{API_UUID}/{Revisions_created}/out and reg_media_type IN ("application/xml","application/vnd.wso2.sequence")
+/_system/governance/apimgt/applicationdata/apis/{API_UUID}/{Revisions_created}/fault and reg_media_type IN ("application/xml","application/vnd.wso2.sequence")
