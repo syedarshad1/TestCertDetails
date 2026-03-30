@@ -1,301 +1,96 @@
-WITH blob_to_clob AS (
-    SELECT 
-        a.API_NAME,
-        a.API_UUID,
-        a.REVISIONS_CREATED,
-        r.reg_content_id,
-        r.reg_uuid,
-        r.reg_name,
-        r.reg_media_type,
-        p.reg_path_value,
-        r.reg_last_updated_time,
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1))) ||
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) ||
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) ||
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 6001))) ||
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 8001))) ||
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 10001))) ||
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 12001))) AS full_xml
-    FROM COCT42_AM.AM_API a
-    JOIN coct42_reg.reg_path p
-        ON p.reg_path_value = CASE 
-            WHEN a.REVISIONS_CREATED = 0 
-            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID
-            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED
-        END
-    JOIN coct42_reg.reg_resource r
-        ON r.reg_path_id = p.reg_path_id
-        AND r.reg_name = 'api'
-    JOIN coct42_reg.reg_content c
-        ON c.reg_content_id = r.reg_content_id
-),
-tag_positions AS (
-    SELECT 
-        b.*,
-        DBMS_LOB.INSTR(full_xml, '<endpointConfig>') AS ec_start,
-        DBMS_LOB.INSTR(full_xml, '</endpointConfig>') AS ec_end,
-        DBMS_LOB.INSTR(full_xml, '<inSequence>') AS is_start,
-        DBMS_LOB.INSTR(full_xml, '</inSequence>') AS is_end,
-        DBMS_LOB.INSTR(full_xml, '<outSequence>') AS os_start,
-        DBMS_LOB.INSTR(full_xml, '</outSequence>') AS os_end,
-        DBMS_LOB.INSTR(full_xml, '<faultSequence>') AS fs_start,
-        DBMS_LOB.INSTR(full_xml, '</faultSequence>') AS fs_end
-    FROM blob_to_clob b
-),
-extracted AS (
-    SELECT 
-        API_NAME,
-        API_UUID,
-        REVISIONS_CREATED,
-        reg_content_id,
-        reg_uuid,
-        reg_name,
-        reg_media_type,
-        reg_path_value,
-        reg_last_updated_time,
-        CASE WHEN ec_start > 0 
-             THEN DBMS_LOB.SUBSTR(full_xml, ec_end - ec_start - 16, ec_start + 16) 
-        END AS endpointConfig,
-        CASE WHEN is_start > 0 
-             THEN DBMS_LOB.SUBSTR(full_xml, is_end - is_start - 12, is_start + 12) 
-        END AS inSequence,
-        CASE WHEN os_start > 0 
-             THEN DBMS_LOB.SUBSTR(full_xml, os_end - os_start - 13, os_start + 13) 
-        END AS outSequence,
-        CASE WHEN fs_start > 0 
-             THEN DBMS_LOB.SUBSTR(full_xml, fs_end - fs_start - 15, fs_start + 15) 
-        END AS faultSequence
-    FROM tag_positions
-),
--- Step 5: Lightweight lookup - just get reg_content_id by sequence name, pick latest
-seq_ref AS (
-    SELECT 
-        CASE 
-            WHEN r_s.reg_name LIKE '%.xml' 
-            THEN SUBSTR(r_s.reg_name, 1, LENGTH(r_s.reg_name) - 4)
-            ELSE r_s.reg_name
-        END AS seq_name_clean,
-        r_s.reg_content_id AS seq_content_id,
-        ROW_NUMBER() OVER (
-            PARTITION BY 
-                CASE 
-                    WHEN r_s.reg_name LIKE '%.xml' 
-                    THEN SUBSTR(r_s.reg_name, 1, LENGTH(r_s.reg_name) - 4)
-                    ELSE r_s.reg_name
-                END
-            ORDER BY r_s.reg_last_updated_time DESC
-        ) AS rn
-    FROM coct42_reg.reg_resource r_s
-    WHERE r_s.reg_media_type IN (
-        'application/vnd.wso2.sequence',
-        'application/xml'
-    )
-),
-seq_latest AS (
-    SELECT seq_name_clean, seq_content_id
-    FROM seq_ref
-    WHERE rn = 1
-),
--- Step 6: Lookup /in, /out, /fault subpaths for each API
--- /in path
-in_path_ref AS (
-    SELECT 
-        a.API_UUID,
-        r_in.reg_content_id AS in_path_content_id,
-        r_in.reg_name AS in_path_reg_name,
-        ROW_NUMBER() OVER (
-            PARTITION BY a.API_UUID
-            ORDER BY r_in.reg_last_updated_time DESC
-        ) AS rn
-    FROM COCT42_AM.AM_API a
-    JOIN coct42_reg.reg_path p_in
-        ON p_in.reg_path_value = CASE 
-            WHEN a.REVISIONS_CREATED = 0 
-            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/in'
-            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED || '/in'
-        END
-    JOIN coct42_reg.reg_resource r_in
-        ON r_in.reg_path_id = p_in.reg_path_id
-        AND r_in.reg_media_type IN ('application/xml', 'application/vnd.wso2.sequence')
-),
-in_path_latest AS (
-    SELECT API_UUID, in_path_content_id, in_path_reg_name
-    FROM in_path_ref
-    WHERE rn = 1
-),
--- /out path
-out_path_ref AS (
-    SELECT 
-        a.API_UUID,
-        r_out.reg_content_id AS out_path_content_id,
-        r_out.reg_name AS out_path_reg_name,
-        ROW_NUMBER() OVER (
-            PARTITION BY a.API_UUID
-            ORDER BY r_out.reg_last_updated_time DESC
-        ) AS rn
-    FROM COCT42_AM.AM_API a
-    JOIN coct42_reg.reg_path p_out
-        ON p_out.reg_path_value = CASE 
-            WHEN a.REVISIONS_CREATED = 0 
-            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/out'
-            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED || '/out'
-        END
-    JOIN coct42_reg.reg_resource r_out
-        ON r_out.reg_path_id = p_out.reg_path_id
-        AND r_out.reg_media_type IN ('application/xml', 'application/vnd.wso2.sequence')
-),
-out_path_latest AS (
-    SELECT API_UUID, out_path_content_id, out_path_reg_name
-    FROM out_path_ref
-    WHERE rn = 1
-),
--- /fault path
-fault_path_ref AS (
-    SELECT 
-        a.API_UUID,
-        r_flt.reg_content_id AS fault_path_content_id,
-        r_flt.reg_name AS fault_path_reg_name,
-        ROW_NUMBER() OVER (
-            PARTITION BY a.API_UUID
-            ORDER BY r_flt.reg_last_updated_time DESC
-        ) AS rn
-    FROM COCT42_AM.AM_API a
-    JOIN coct42_reg.reg_path p_flt
-        ON p_flt.reg_path_value = CASE 
-            WHEN a.REVISIONS_CREATED = 0 
-            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/fault'
-            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED || '/fault'
-        END
-    JOIN coct42_reg.reg_resource r_flt
-        ON r_flt.reg_path_id = p_flt.reg_path_id
-        AND r_flt.reg_media_type IN ('application/xml', 'application/vnd.wso2.sequence')
-),
-fault_path_latest AS (
-    SELECT API_UUID, fault_path_content_id, fault_path_reg_name
-    FROM fault_path_ref
-    WHERE rn = 1
-)
-SELECT 
-    e.API_NAME,
-    e.API_UUID,
-    e.REVISIONS_CREATED,
-    e.reg_content_id,
-    e.reg_uuid,
-    e.reg_name,
-    e.reg_media_type,
-    e.reg_path_value,
-    e.reg_last_updated_time,
-    e.endpointConfig,
-    
-    -- Step 5: inSequence name + content from seq_latest
-    e.inSequence AS inSequence_name,
-    CASE 
-        WHEN e.inSequence IS NOT NULL AND isl.seq_content_id IS NOT NULL 
-            THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 1))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 2001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 4001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 6001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 8001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 10001)))
-        WHEN e.inSequence IS NOT NULL 
-            THEN TO_CLOB('NOT FOUND')
-        ELSE TO_CLOB(NULL)
-    END AS inSequence_content,
-    
-    -- Step 5: outSequence name + content from seq_latest
-    e.outSequence AS outSequence_name,
-    CASE 
-        WHEN e.outSequence IS NOT NULL AND osl.seq_content_id IS NOT NULL 
-            THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 1))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 2001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 4001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 6001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 8001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 10001)))
-        WHEN e.outSequence IS NOT NULL 
-            THEN TO_CLOB('NOT FOUND')
-        ELSE TO_CLOB(NULL)
-    END AS outSequence_content,
-    
-    -- Step 5: faultSequence name + content from seq_latest
-    e.faultSequence AS faultSequence_name,
-    CASE 
-        WHEN e.faultSequence IS NOT NULL AND fsl.seq_content_id IS NOT NULL 
-            THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 1))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 2001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 4001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 6001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 8001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 10001)))
-        WHEN e.faultSequence IS NOT NULL 
-            THEN TO_CLOB('NOT FOUND')
-        ELSE TO_CLOB(NULL)
-    END AS faultSequence_content,
-    
-    -- Step 6: /in path - reg_name and blob content
-    ipl.in_path_reg_name,
-    CASE 
-        WHEN ipl.in_path_content_id IS NOT NULL 
-            THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 1))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 2001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 4001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 6001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 8001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 10001)))
-        ELSE TO_CLOB(NULL)
-    END AS inSequence_reg_path,
-    
-    -- Step 6: /out path - reg_name and blob content
-    opl.out_path_reg_name,
-    CASE 
-        WHEN opl.out_path_content_id IS NOT NULL 
-            THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 1))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 2001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 4001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 6001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 8001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 10001)))
-        ELSE TO_CLOB(NULL)
-    END AS outSequence_reg_path,
-    
-    -- Step 6: /fault path - reg_name and blob content
-    fpl.fault_path_reg_name,
-    CASE 
-        WHEN fpl.fault_path_content_id IS NOT NULL 
-            THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 1))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 2001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 4001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 6001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 8001))) ||
-                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 10001)))
-        ELSE TO_CLOB(NULL)
-    END AS faultSequence_reg_path
-
-FROM extracted e
--- Step 5 joins
-LEFT JOIN seq_latest isl
-    ON isl.seq_name_clean = e.inSequence
-LEFT JOIN coct42_reg.reg_content c_in
-    ON c_in.reg_content_id = isl.seq_content_id
-LEFT JOIN seq_latest osl
-    ON osl.seq_name_clean = e.outSequence
-LEFT JOIN coct42_reg.reg_content c_out
-    ON c_out.reg_content_id = osl.seq_content_id
-LEFT JOIN seq_latest fsl
-    ON fsl.seq_name_clean = e.faultSequence
-LEFT JOIN coct42_reg.reg_content c_flt
-    ON c_flt.reg_content_id = fsl.seq_content_id
--- Step 6 joins
-LEFT JOIN in_path_latest ipl
-    ON ipl.API_UUID = e.API_UUID
-LEFT JOIN coct42_reg.reg_content c_ip
-    ON c_ip.reg_content_id = ipl.in_path_content_id
-LEFT JOIN out_path_latest opl
-    ON opl.API_UUID = e.API_UUID
-LEFT JOIN coct42_reg.reg_content c_op
-    ON c_op.reg_content_id = opl.out_path_content_id
-LEFT JOIN fault_path_latest fpl
-    ON fpl.API_UUID = e.API_UUID
-LEFT JOIN coct42_reg.reg_content c_fp
-    ON c_fp.reg_content_id = fpl.fault_path_content_id
-ORDER BY e.reg_last_updated_time DESC;
+GRP-TransactionHistoryV2	b7329382-16ce-4448-a2d6-b3814bf4d739	1	15706247	8df87b26-2852-4224-b6dd-6911677256a9	api	application/vnd.wso2-api+xml	/_system/governance/apimgt/applicationdata/apis/b7329382-16ce-4448-a2d6-b3814bf4d739/1	08-AUG-25 03.10.54.049000000 PM	{"production_endpoints":{"url":"https://payments-ic.prod.local/xpressNg/rest/payment/v2","config":null,"template_not_supported":false},"sandbox_endpoints":{"url":"https://payments-ic.prod.local/xpressNg/rest/payment/v2","config":null,"template_not_supported":false},"endpoint_type":"http"}	FISPayment-Jwt--Ext--In_v1	NOT FOUND					PROD-NEW	"<sequence xmlns="http://ws.apache.org/ns/synapse" name="PROD-NEW" trace="disable">
+	<filter source="boolean(get-property('transport', 'NO-PAYMENT-AUTH'))" regex="false">
+		<then>
+			<log level="custom">       
+						<property value="Brokered Approach started...Mediation created on 19/10/2018 11:49" name="NO-PAYMENT-AUTH"/>
+			</log>
+			<class name="com.fisglobal.grpdigital.mediator.GetAuthJWTCacheMediator"/>
+			<log level="custom">       
+				<property expression="get-property('ApplicationName')" name="ApplicationName"/>
+				<property expression="get-property('EndUserName')" name="EndUserName"/>
+				<property expression="get-property('CONSUMER_KEY')" name="ConsumerKey"/>
+				<property expression="get-property('API_AUTH_JWT')" name="API_AUTH_JWT"/>
+			</log>
+			
+			<filter source="boolean(get-property('API_AUTH_JWT'))" regex="false">
+				<then>
+					<log level="custom">       
+						<property value="JWT not found in Cache." name="JWT"/>
+					</log>
+					
+					<property expression="json-eval($)" name="PAYLOADD"/>
+					<!-- Backup URI  -->
+					<property expression="get-property('axis2', 'REST_URL_POSTFIX')" name="API_URI" scope="default" type="STRING"/>
+					<!-- Remove URI  -->
+					<property action="remove" name="REST_URL_POSTFIX" scope="axis2"/>
+					<property expression="get-property('CONSUMER_KEY')" name="consumerd"/>
+					<payloadFactory media-type="json">
+						<format>{
+									"consumerKey":"$1"
+								}
+						</format>
+						<args><arg evaluator="json" expression="$.consumerd"/></args>
+					</payloadFactory>
+					<script language="js">
+						<![CDATA[mc.setPayloadJSON({"consumerKey":mc.getProperty('consumerd')});]]>
+					</script>
+					
+					<call blocking="true">
+						<endpoint>
+							<http method="post" uri-template="https://BDC1REPOAPIAP5.prod.local:8455/authservice/getjwt"/>
+						</endpoint>
+					</call>
+					<log level="custom">
+						<property expression="json-eval($)" name="output1"/>
+					</log>
+					<filter source="get-property('axis2', 'HTTP_SC')" regex="200">
+						<then>
+							<log level="custom">
+								<property name="switchlog" value="Case: Autherization Service call successful"/>
+							</log>
+						</then>
+						<else>
+							<log level="custom">
+								<property name="switchlog" value="Case: Autherization Service fails with error: "/>
+								 <property expression="json-eval($)" name="output"/>
+							</log>
+							<property name="HTTP_SC" value="500" scope="axis2"/>
+							<payloadFactory media-type="json">
+								<format>{ "status": "JWT not found."}</format>
+								<args/>
+							</payloadFactory>
+							<respond/>
+						</else>
+					</filter>
+					
+					<property expression="json-eval($.JWT)" name="API_AUTH_JWT" type="STRING"/>
+					<log level="custom">
+						<property expression="get-property('API_AUTH_JWT')" name="JWT"/>
+					</log>
+					
+					<class name="com.fisglobal.grpdigital.mediator.AddAuthJWTCacheMediator"/>
+					
+					<property expression="get-property('API_URI')" name="REST_URL_POSTFIX" scope="axis2" type="STRING"/>
+					<script language="js">
+						<![CDATA[mc.setPayloadJSON(mc.getProperty('PAYLOADD'));]]>
+					</script>
+				</then>
+				<else>
+					<log level="custom">       
+						<property value="JWT found in Cache." name="JWT"/>
+						<property expression="get-property('API_AUTH_JWT')" name="JWT"/>
+					</log>
+				</else>
+			</filter>
+			<property expression="get-property('API_AUTH_JWT')" name="Authorization" scope="transport" type="STRING"/>
+			<property value="PAYMENT" name="Application-Id" scope="transport" type="STRING"/>
+		</then>
+		<else>
+			<log level="custom">       
+				<property value="Brokered Approach skipped" name="NO-PAYMENT-AUTH"/>
+			</log>
+			<property action="remove" name="NO-PAYMENT-AUTH" scope="transport"/>
+		</else>
+	</filter>
+</sequence>"				
+Transfers-Internal	eb1c20e1-d025-4dc3-813c-9fc96a70fbf6	1	15706195	59ad6108-db1e-4d96-ae4a-b9e3cccf661a	api	application/vnd.wso2-api+xml	/_system/governance/apimgt/applicationdata/apis/eb1c20e1-d025-4dc3-813c-9fc96a70fbf6/1	08-AUG-25 03.10.52.261000000 PM	{"endpoint_type":"default","sandbox_endpoints":{"url":"http:\/\/codeconnect-mockarena-app:8080"},"production_endpoints":{"url":"http:\/\/codeconnect-mockarena-app:8080"}}	global-mbp-api-seq-in	NOT FOUND	global-mbp-api-seq-out	NOT FOUND	global-mbp-api-seq-fault	NOT FOUND						
