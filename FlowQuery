@@ -1,5 +1,6 @@
 WITH blob_to_clob AS (
     SELECT 
+        a.API_NAME,
         a.API_UUID,
         a.REVISIONS_CREATED,
         r.reg_content_id,
@@ -14,7 +15,19 @@ WITH blob_to_clob AS (
         TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 6001))) ||
         TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 8001))) ||
         TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 10001))) ||
-        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 12001))) AS full_xml
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 12001))) AS full_xml,
+        CASE WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/in'
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED || '/in'
+        END AS in_path,
+        CASE WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/out'
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED || '/out'
+        END AS out_path,
+        CASE WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/fault'
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED || '/fault'
+        END AS fault_path
     FROM COCT42_AM.AM_API a
     JOIN coct42_reg.reg_path p
         ON p.reg_path_value = CASE 
@@ -38,21 +51,79 @@ tag_positions AS (
         DBMS_LOB.INSTR(full_xml, '<outSequence>') AS os_start,
         DBMS_LOB.INSTR(full_xml, '</outSequence>') AS os_end,
         DBMS_LOB.INSTR(full_xml, '<faultSequence>') AS fs_start,
-        DBMS_LOB.INSTR(full_xml, '</faultSequence>') AS fs_end
+        DBMS_LOB.INSTR(full_xml, '</faultSequence>') AS fs_end,
+        r_in.reg_content_id AS in_reg_content_id,
+        r_out.reg_content_id AS out_reg_content_id,
+        r_fault.reg_content_id AS fault_reg_content_id,
+        c_in.reg_content_data AS in_blob,
+        c_out.reg_content_data AS out_blob,
+        c_fault.reg_content_data AS fault_blob
     FROM blob_to_clob b
+    LEFT JOIN coct42_reg.reg_path p_in
+        ON p_in.reg_path_value = b.in_path
+    LEFT JOIN coct42_reg.reg_resource r_in
+        ON r_in.reg_path_id = p_in.reg_path_id
+        AND r_in.reg_media_type = 'application/xml'
+    LEFT JOIN coct42_reg.reg_content c_in
+        ON c_in.reg_content_id = r_in.reg_content_id
+    LEFT JOIN coct42_reg.reg_path p_out
+        ON p_out.reg_path_value = b.out_path
+    LEFT JOIN coct42_reg.reg_resource r_out
+        ON r_out.reg_path_id = p_out.reg_path_id
+        AND r_out.reg_media_type = 'application/xml'
+    LEFT JOIN coct42_reg.reg_content c_out
+        ON c_out.reg_content_id = r_out.reg_content_id
+    LEFT JOIN coct42_reg.reg_path p_fault
+        ON p_fault.reg_path_value = b.fault_path
+    LEFT JOIN coct42_reg.reg_resource r_fault
+        ON r_fault.reg_path_id = p_fault.reg_path_id
+        AND r_fault.reg_media_type = 'application/xml'
+    LEFT JOIN coct42_reg.reg_content c_fault
+        ON c_fault.reg_content_id = r_fault.reg_content_id
 )
 SELECT 
+    API_NAME,
     API_UUID,
     REVISIONS_CREATED,
     reg_content_id,
-    reg_uuid,
-    reg_name,
-    reg_media_type,
     reg_path_value,
     reg_last_updated_time,
     CASE WHEN ec_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, ec_end - ec_start - 16, ec_start + 16) END AS endpointConfig,
     CASE WHEN is_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, is_end - is_start - 12, is_start + 12) END AS inSequence,
     CASE WHEN os_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, os_end - os_start - 13, os_start + 13) END AS outSequence,
-    CASE WHEN fs_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, fs_end - fs_start - 15, fs_start + 15) END AS faultSequence
+    CASE WHEN fs_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, fs_end - fs_start - 15, fs_start + 15) END AS faultSequence,
+    CASE 
+        WHEN in_blob IS NULL THEN TO_CLOB('NOT FOUND')
+        ELSE
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(in_blob, 2000, 1))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(in_blob, 2000, 2001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(in_blob, 2000, 4001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(in_blob, 2000, 6001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(in_blob, 2000, 8001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(in_blob, 2000, 10001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(in_blob, 2000, 12001)))
+    END AS insequence_reg_data,
+    CASE 
+        WHEN out_blob IS NULL THEN TO_CLOB('NOT FOUND')
+        ELSE
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(out_blob, 2000, 1))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(out_blob, 2000, 2001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(out_blob, 2000, 4001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(out_blob, 2000, 6001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(out_blob, 2000, 8001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(out_blob, 2000, 10001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(out_blob, 2000, 12001)))
+    END AS outsequence_reg_data,
+    CASE 
+        WHEN fault_blob IS NULL THEN TO_CLOB('NOT FOUND')
+        ELSE
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(fault_blob, 2000, 1))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(fault_blob, 2000, 2001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(fault_blob, 2000, 4001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(fault_blob, 2000, 6001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(fault_blob, 2000, 8001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(fault_blob, 2000, 10001))) ||
+            TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(fault_blob, 2000, 12001)))
+    END AS faultsequence_reg_data
 FROM tag_positions
 ORDER BY reg_last_updated_time DESC;
