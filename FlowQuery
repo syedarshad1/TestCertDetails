@@ -95,6 +95,85 @@ seq_latest AS (
     SELECT seq_name_clean, seq_content_id
     FROM seq_ref
     WHERE rn = 1
+),
+-- Step 6: Lookup /in, /out, /fault subpaths for each API
+-- /in path
+in_path_ref AS (
+    SELECT 
+        a.API_UUID,
+        r_in.reg_content_id AS in_path_content_id,
+        r_in.reg_name AS in_path_reg_name,
+        ROW_NUMBER() OVER (
+            PARTITION BY a.API_UUID
+            ORDER BY r_in.reg_last_updated_time DESC
+        ) AS rn
+    FROM COCT42_AM.AM_API a
+    JOIN coct42_reg.reg_path p_in
+        ON p_in.reg_path_value = CASE 
+            WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/in'
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED || '/in'
+        END
+    JOIN coct42_reg.reg_resource r_in
+        ON r_in.reg_path_id = p_in.reg_path_id
+        AND r_in.reg_media_type IN ('application/xml', 'application/vnd.wso2.sequence')
+),
+in_path_latest AS (
+    SELECT API_UUID, in_path_content_id, in_path_reg_name
+    FROM in_path_ref
+    WHERE rn = 1
+),
+-- /out path
+out_path_ref AS (
+    SELECT 
+        a.API_UUID,
+        r_out.reg_content_id AS out_path_content_id,
+        r_out.reg_name AS out_path_reg_name,
+        ROW_NUMBER() OVER (
+            PARTITION BY a.API_UUID
+            ORDER BY r_out.reg_last_updated_time DESC
+        ) AS rn
+    FROM COCT42_AM.AM_API a
+    JOIN coct42_reg.reg_path p_out
+        ON p_out.reg_path_value = CASE 
+            WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/out'
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED || '/out'
+        END
+    JOIN coct42_reg.reg_resource r_out
+        ON r_out.reg_path_id = p_out.reg_path_id
+        AND r_out.reg_media_type IN ('application/xml', 'application/vnd.wso2.sequence')
+),
+out_path_latest AS (
+    SELECT API_UUID, out_path_content_id, out_path_reg_name
+    FROM out_path_ref
+    WHERE rn = 1
+),
+-- /fault path
+fault_path_ref AS (
+    SELECT 
+        a.API_UUID,
+        r_flt.reg_content_id AS fault_path_content_id,
+        r_flt.reg_name AS fault_path_reg_name,
+        ROW_NUMBER() OVER (
+            PARTITION BY a.API_UUID
+            ORDER BY r_flt.reg_last_updated_time DESC
+        ) AS rn
+    FROM COCT42_AM.AM_API a
+    JOIN coct42_reg.reg_path p_flt
+        ON p_flt.reg_path_value = CASE 
+            WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/fault'
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED || '/fault'
+        END
+    JOIN coct42_reg.reg_resource r_flt
+        ON r_flt.reg_path_id = p_flt.reg_path_id
+        AND r_flt.reg_media_type IN ('application/xml', 'application/vnd.wso2.sequence')
+),
+fault_path_latest AS (
+    SELECT API_UUID, fault_path_content_id, fault_path_reg_name
+    FROM fault_path_ref
+    WHERE rn = 1
 )
 SELECT 
     e.API_NAME,
@@ -108,6 +187,7 @@ SELECT
     e.reg_last_updated_time,
     e.endpointConfig,
     
+    -- Step 5: inSequence name + content from seq_latest
     e.inSequence AS inSequence_name,
     CASE 
         WHEN e.inSequence IS NOT NULL AND isl.seq_content_id IS NOT NULL 
@@ -122,6 +202,7 @@ SELECT
         ELSE TO_CLOB(NULL)
     END AS inSequence_content,
     
+    -- Step 5: outSequence name + content from seq_latest
     e.outSequence AS outSequence_name,
     CASE 
         WHEN e.outSequence IS NOT NULL AND osl.seq_content_id IS NOT NULL 
@@ -136,6 +217,7 @@ SELECT
         ELSE TO_CLOB(NULL)
     END AS outSequence_content,
     
+    -- Step 5: faultSequence name + content from seq_latest
     e.faultSequence AS faultSequence_name,
     CASE 
         WHEN e.faultSequence IS NOT NULL AND fsl.seq_content_id IS NOT NULL 
@@ -148,9 +230,49 @@ SELECT
         WHEN e.faultSequence IS NOT NULL 
             THEN TO_CLOB('NOT FOUND')
         ELSE TO_CLOB(NULL)
-    END AS faultSequence_content
+    END AS faultSequence_content,
+    
+    -- Step 6: /in path - reg_name and blob content
+    ipl.in_path_reg_name,
+    CASE 
+        WHEN ipl.in_path_content_id IS NOT NULL 
+            THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 1))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 2001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 4001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 6001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 8001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 10001)))
+        ELSE TO_CLOB(NULL)
+    END AS inSequence_reg_path,
+    
+    -- Step 6: /out path - reg_name and blob content
+    opl.out_path_reg_name,
+    CASE 
+        WHEN opl.out_path_content_id IS NOT NULL 
+            THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 1))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 2001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 4001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 6001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 8001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 10001)))
+        ELSE TO_CLOB(NULL)
+    END AS outSequence_reg_path,
+    
+    -- Step 6: /fault path - reg_name and blob content
+    fpl.fault_path_reg_name,
+    CASE 
+        WHEN fpl.fault_path_content_id IS NOT NULL 
+            THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 1))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 2001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 4001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 6001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 8001))) ||
+                 TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 10001)))
+        ELSE TO_CLOB(NULL)
+    END AS faultSequence_reg_path
 
 FROM extracted e
+-- Step 5 joins
 LEFT JOIN seq_latest isl
     ON isl.seq_name_clean = e.inSequence
 LEFT JOIN coct42_reg.reg_content c_in
@@ -163,4 +285,17 @@ LEFT JOIN seq_latest fsl
     ON fsl.seq_name_clean = e.faultSequence
 LEFT JOIN coct42_reg.reg_content c_flt
     ON c_flt.reg_content_id = fsl.seq_content_id
+-- Step 6 joins
+LEFT JOIN in_path_latest ipl
+    ON ipl.API_UUID = e.API_UUID
+LEFT JOIN coct42_reg.reg_content c_ip
+    ON c_ip.reg_content_id = ipl.in_path_content_id
+LEFT JOIN out_path_latest opl
+    ON opl.API_UUID = e.API_UUID
+LEFT JOIN coct42_reg.reg_content c_op
+    ON c_op.reg_content_id = opl.out_path_content_id
+LEFT JOIN fault_path_latest fpl
+    ON fpl.API_UUID = e.API_UUID
+LEFT JOIN coct42_reg.reg_content c_fp
+    ON c_fp.reg_content_id = fpl.fault_path_content_id
 ORDER BY e.reg_last_updated_time DESC;
