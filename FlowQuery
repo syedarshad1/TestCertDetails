@@ -48,12 +48,8 @@ extracted AS (
         API_UUID,
         REVISIONS_CREATED,
         reg_content_id,
-        reg_uuid,
-        reg_name,
-        reg_media_type,
         reg_path_value,
         reg_last_updated_time,
-        full_xml,
         CASE WHEN ec_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, ec_end - ec_start - 16, ec_start + 16) END AS endpointConfig,
         CASE WHEN is_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, is_end - is_start - 12, is_start + 12) END AS inSequence,
         CASE WHEN os_start > 0 THEN DBMS_LOB.SUBSTR(full_xml, os_end - os_start - 13, os_start + 13) END AS outSequence,
@@ -71,7 +67,6 @@ SELECT
     e.inSequence,
     e.outSequence,
     e.faultSequence,
-    -- inSequence file content
     CASE 
         WHEN e.inSequence IS NULL OR e.inSequence = '' THEN TO_CLOB('NOT FOUND')
         WHEN c_in.reg_content_data IS NULL THEN TO_CLOB('NOT FOUND')
@@ -84,7 +79,6 @@ SELECT
             TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 10001))) ||
             TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 12001)))
     END AS insequence_reg_data,
-    -- outSequence file content
     CASE 
         WHEN e.outSequence IS NULL OR e.outSequence = '' THEN TO_CLOB('NOT FOUND')
         WHEN c_out.reg_content_data IS NULL THEN TO_CLOB('NOT FOUND')
@@ -97,7 +91,6 @@ SELECT
             TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 10001))) ||
             TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 12001)))
     END AS outsequence_reg_data,
-    -- faultSequence file content
     CASE 
         WHEN e.faultSequence IS NULL OR e.faultSequence = '' THEN TO_CLOB('NOT FOUND')
         WHEN c_fault.reg_content_data IS NULL THEN TO_CLOB('NOT FOUND')
@@ -111,25 +104,19 @@ SELECT
             TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fault.reg_content_data, 2000, 12001)))
     END AS faultsequence_reg_data
 FROM extracted e
--- Search inSequence by name using LIKE
 LEFT JOIN coct42_reg.reg_resource r_in
     ON r_in.reg_name LIKE '%' || e.inSequence || '%'
-    AND e.inSequence IS NOT NULL
-    AND e.inSequence != ''
+    AND e.inSequence IS NOT NULL AND e.inSequence != ''
 LEFT JOIN coct42_reg.reg_content c_in
     ON c_in.reg_content_id = r_in.reg_content_id
--- Search outSequence by name using LIKE
 LEFT JOIN coct42_reg.reg_resource r_out
     ON r_out.reg_name LIKE '%' || e.outSequence || '%'
-    AND e.outSequence IS NOT NULL
-    AND e.outSequence != ''
+    AND e.outSequence IS NOT NULL AND e.outSequence != ''
 LEFT JOIN coct42_reg.reg_content c_out
     ON c_out.reg_content_id = r_out.reg_content_id
--- Search faultSequence by name using LIKE
 LEFT JOIN coct42_reg.reg_resource r_fault
     ON r_fault.reg_name LIKE '%' || e.faultSequence || '%'
-    AND e.faultSequence IS NOT NULL
-    AND e.faultSequence != ''
+    AND e.faultSequence IS NOT NULL AND e.faultSequence != ''
 LEFT JOIN coct42_reg.reg_content c_fault
     ON c_fault.reg_content_id = r_fault.reg_content_id
 ORDER BY e.reg_last_updated_time DESC;
