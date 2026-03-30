@@ -122,25 +122,6 @@ Step 5:
 
 If you find the inSequence/outSequence/faultSequence, I want to see the content of sequence file using reg_content_id, which is blob data again in insequence column itself, then just file name.
 
-SELECT
-  r.reg_content_id,
-  r.reg_uuid,
-  r.reg_name,
-  r.reg_media_type,
-  p.reg_path_value,
-  r.reg_last_updated_time
-FROM coct42_reg.reg_resource r
-JOIN coct42_reg.reg_path p
-  ON r.reg_path_id = p.reg_path_id
-WHERE r.reg_name LIKE 'soap_endpoint_seq_rbc_in%'
-  AND r.reg_media_type IN (
-      'application/vnd.wso2.sequence',
-      'application/xml'
-  )
-ORDER BY r.reg_last_updated_time DESC;
-
-Pick the latest date row
-
 WITH blob_to_clob AS (
     SELECT 
         a.API_NAME,
@@ -231,7 +212,9 @@ seq_ref AS (
     FROM coct42_reg.reg_resource r_s
     WHERE r_s.reg_media_type IN (
         'application/vnd.wso2.sequence',
-        'application/xml'
+        'application/xml',
+        'application/octet-stream',
+        'application/json'
     )
 ),
 seq_latest AS (
