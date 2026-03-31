@@ -1,10 +1,9 @@
-18945919	5d964db0-0589-4e3e-b870-48c2eb611aa2	FISContentManagementAPITechDoc.pdf	application/pdf	/_system/governance/apimgt/applicationdata/apis/57acd129-630a-4455-9282-07080b848855/8/documentation/files
-18945917	cd4953e8-2028-4237-be29-807b7b5a2262	FIS-content-management-v3-Release Notes.pdf	application/pdf	/_system/governance/apimgt/applicationdata/apis/57acd129-630a-4455-9282-07080b848855/8/documentation/files
-	4c610285-6837-460a-8b45-5e8bb77dc868			/_system/governance/apimgt/applicationdata/apis/57acd129-630a-4455-9282-07080b848855/8/documentation/files
-	6a475b5f-05af-4aa0-9c88-033f3c8b5d93			/_system/governance/apimgt/applicationdata/apis/57acd129-630a-4455-9282-07080b848855/8/documentation
-18945915	31aeb92a-e3b4-42c3-b656-18e5d8052631	swagger.json	application/json	/_system/governance/apimgt/applicationdata/apis/57acd129-630a-4455-9282-07080b848855/8
-18945913	fde42506-d14c-45f8-8fb9-8f153d1c4c4e	api	application/vnd.wso2-api+xml	/_system/governance/apimgt/applicationdata/apis/57acd129-630a-4455-9282-07080b848855/8
-	33255b34-6bee-4781-8d91-e2fb7c2a6bba			/_system/governance/apimgt/applicationdata/apis/57acd129-630a-4455-9282-07080b848855/8
-
-
-10543031	ca3c0ff8-c81e-4378-bd27-20925359060c	Imaging_FCM_routing_flow_in_v3_update.xml	application/json	/_system/governance/apimgt/customsequences/in	13-AUG-24 10.06.43.515000000 PM
+SELECT 
+    r.REG_PATH_ID,
+    r.REG_FULL_PATH,
+    r.REG_NAME,
+    CAST(c.REG_CONTENT AS CLOB) AS SEQUENCE_CONTENT
+FROM REG_RESOURCE r
+LEFT JOIN REG_RESOURCE_CONTENT c ON r.REG_PATH_ID = c.REG_PATH_ID
+WHERE r.REG_PATH_ID = 10543031
+   OR r.REG_FULL_PATH = '/_system/governance/apimgt/customsequences/in/Imaging_FCM_routing_flow_in_v3_update.xml';
