@@ -1,16 +1,118 @@
-SELECT 
-  r.reg_content_id,
-  r.reg_uuid,
-  r.reg_name,
-  r.reg_media_type,
-  p.reg_path_value,
-  r.reg_last_updated_time
-FROM coct42_reg.reg_resource r
-JOIN coct42_reg.reg_path p
-  ON r.reg_path_id = p.reg_path_id
-WHERE r.reg_name like '%Imaging_FCM_routing_flow_in_v3_update%'
-  --AND p.reg_path_value LIKE '%Transfer%'
-   --p.reg_path_value LIKE '%57acd129-630a-4455-9282-07080b848855%'
-  --AND p.reg_path_value  LIKE '%Billpay%'
-  --AND r.reg_tenant_id = 12
-ORDER BY r.reg_last_updated_time DESC;
+<sequence xmlns="http://ws.apache.org/ns/synapse" name="Imaging_FCM_routing_flow_in_v3_update" trace="enable">
+
+    <!--Pulls out the tenant id's customer portion from the entity-id header -->
+    <!--Note: If User fails to provide the "/tenants/.+(/.*)" URL portion, WSO2 will reject the request as 
+        "not found" before hitting this mediation. Thus, all requests are guarenteed to meet the first 
+        regex.--> 
+
+  <property expression="get-property('transport', 'entity-id')" name="entityId" scope="default" type="STRING"/>
+  <property expression="get-property('registry', 'conf:repository/resources/endpoints/imaging-standard-endpoints.xml')" name="target_endpoint" scope="default" type="OM"/>
+  <property expression="$ctx:target_endpoint/url[@id='mock']/text()" name="mockPt" scope="default" type="STRING"/>
+  <property expression="$ctx:target_endpoint/entities/entity[@id='000001']/text()" name="entity_id_url" scope="default" type="STRING"/>
+
+  <filter regex="false" source="boolean($ctx:entityId)">
+    <then>
+      <payloadFactory description="ErrorResponse" media-type="json">
+        <format>
+          {
+              "type": "entity-id not found",
+              "details": [{
+                  "code": "400",
+                  "message": "No configuration found for the given entity and this is really Not GOOD!",
+                  "field": "entity",
+                  "entity": "$1 - $2"
+              }]
+          }
+        </format>
+        <args>
+          <arg expression="$ctx:mockPt"/>
+          <arg expression="$ctx:REST_API_CONTEXT"/>
+        </args>
+      </payloadFactory>
+      <property name="RESPONSE" scope="default" type="STRING" value="true"/>
+      <header action="remove" name="To" scope="default"/>
+      <property action="remove" name="NO_ENTITY_BODY" scope="axis2"/>
+      <property action="remove" name="ContentType" scope="axis2"/>
+      <property name="messageType" scope="axis2" type="STRING" value="application/json"/>
+      <property description="SetStatusCode" name="HTTP_SC" scope="axis2" type="STRING" value="400"/>
+      <respond/>
+    </then>
+    <else>
+      <!--Retrieves Registry information (used to collect entity URL)-->
+      <property expression="get-property('registry', 'conf:repository/resources/endpoints/imaging-standard-endpoints.xml')" name="target_endpoint" scope="default" type="OM"/>
+
+      <log level="custom">
+        <property expression="$ctx:target_endpoint/entities/entity[@id=$ctx:entityId]/text()" name="entity_id_log"/>
+      </log>
+      <property expression="$ctx:target_endpoint/entities/entity[@id=$ctx:entityId]/text()" name="entity_url"/>
+
+      <!--Set Imaging entity in request to Organization ID header-->
+      <property description="Set Organization ID" expression="fn:concat('Imaging-', $ctx:entityId)" name="organization-id" scope="transport" type="STRING"/>
+
+      <!-- Check for a Sandbox Key first -->
+      <filter regex="SANDBOX" source="$ctx:AM_KEY_TYPE"> 
+        <then>
+          <log level="custom">
+            <property name="API_Flow_URL" value="Sandbox Key Used *************"/>
+            <property expression="fn:concat($ctx:target_endpoint/url[@id='mock']/text(),$ctx:REST_API_CONTEXT)" name="sandbox_ep"/>
+          </log>
+
+          <property name="Content-Type" scope="axis2" type="STRING" value="application/json"/>
+          <header expression="fn:concat($ctx:target_endpoint/url[@id='mock']/text(),$ctx:REST_API_CONTEXT)" name="To" scope="default"/>
+
+          <!-- Swap out our CC and FCM headers as needed by FCM -->
+          <property description="Get entity-token" expression="get-property('transport', 'entity-token')" name="entity-token" scope="default" type="STRING"/>
+          <property description="Set Authorization to entity-token" expression="get-property('entity-token')" name="Authorization" scope="transport" type="STRING"/>
+          <property action="remove" description="Remove entity-token" name="entity-token" scope="transport"/>
+        </then>
+        <else>
+          <!-- Match the entity with a URL that is not in the sandbox environment -->
+          <filter regex="true" source="boolean($ctx:entity_url)">
+            <then>
+              <!-- Set URL of the request specific to the entity -->
+              <header expression="$ctx:entity_url" name="To" scope="default"/>
+
+              <property name="entity-url" expression="$ctx:entity_url" scope="transport" type="STRING"/>
+
+              <!-- Swap out our CC and FCM headers as needed by FCM -->
+              <property description="Get entity-token" expression="get-property('transport', 'entity-token')" name="entity-token" scope="default" type="STRING"/>
+              <property description="Set Authorization to entity-token" expression="get-property('entity-token')" name="Authorization" scope="transport" type="STRING"/>
+              <property action="remove" description="Remove entity-token" name="entity-token" scope="transport"/>
+            </then>
+            <else>
+              <log level="custom">
+                <property name="API_Flow" value="NO MATCH *************"/>
+              </log>
+              <payloadFactory description="ErrorResponse" media-type="json">
+                <format>
+                  {
+                      "type": "Invalid Parameters",
+                      "details": [{
+                          "code": "400",
+                          "message": "No configuration found for the given entity and this is bad",
+                          "field": "entity",
+                          "entity": "$1 - $2"
+                      }]
+                  }
+                </format>
+                <args>
+                  <arg expression="$ctx:entityId"/>
+                  <arg expression="$trp:entity-id"/>
+                </args>
+              </payloadFactory>
+              <property name="RESPONSE" scope="default" type="STRING" value="true"/>
+              <header action="remove" name="To" scope="default"/>
+              <property action="remove" name="NO_ENTITY_BODY" scope="axis2"/>
+              <property action="remove" name="ContentType" scope="axis2"/>
+              <property name="messageType" scope="axis2" type="STRING" value="application/json"/>
+              <property action="remove" name="X-Forwarded-Server" scope="transport"/>
+              <property action="remove" name="X-Forwarded-For" scope="transport"/>
+              <property description="SetStatusCode" name="HTTP_SC" scope="axis2" type="STRING" value="400"/>
+              <respond/>
+            </else>
+          </filter>
+        </else>
+      </filter>
+    </else>
+  </filter>
+</sequence>
