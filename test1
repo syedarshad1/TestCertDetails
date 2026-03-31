@@ -1,57 +1,11 @@
-$ grep -r '30000' *
-axis2/axis2.xml:    <parameter name="ConfigContextTimeoutInterval" locked="false">30000</parameter>
-axis2/axis2.xml:    <!--<transaction timeout="30000">
-axis2/axis2_ControlPlane.xml:    <parameter name="ConfigContextTimeoutInterval" locked="false">30000</parameter>
-axis2/axis2_ControlPlane.xml:    <!--<transaction timeout="30000">
-axis2/axis2_KM.xml:    <parameter name="ConfigContextTimeoutInterval" locked="false">30000</parameter>
-axis2/axis2_KM.xml:    <!--<transaction timeout="30000">
-axis2/axis2_blocking_client.xml:    <parameter name="ConfigContextTimeoutInterval">30000</parameter>
-axis2/axis2_client.xml:    <parameter name="maxTotalConnections">30000</parameter>
-carbon.xml:        <ServiceGroupContextIdleTime>30000</ServiceGroupContextIdleTime>
-data-bridge/data-agent-config.xml:        <SocketTimeoutMS>30000</SocketTimeoutMS>
-data-bridge/data-agent-config.xml:        <SocketTimeoutMS>30000</SocketTimeoutMS>
-datasources/master-datasources.xml:                    <validationInterval>30000</validationInterval>
-datasources/master-datasources.xml:                    <validationInterval>30000</validationInterval>
-datasources/master-datasources.xml:                    <validationInterval>30000</validationInterval>
-datasources/master-datasources.xml:                    <validationInterval>30000</validationInterval>
-datasources/metrics-datasources.xml:                    <validationInterval>30000</validationInterval>
-datasources/metrics-datasources.xml:                    <validationInterval>30000</validationInterval>
-datasources/metrics-datasources.xml:                    <validationInterval>30000</validationInterval>
-datasources/metrics-datasources.xml:                    <validationInterval>30000</validationInterval>
-deployment.toml:MaxRoleNameListLength = "30000"
-deployment.toml:max_total_connections = 30000
-deployment.toml_01302026:MaxRoleNameListLength = "30000"
-deployment.toml_01302026:max_total_connections = 30000
-deployment.toml_02152026:MaxRoleNameListLength = "30000"
-deployment.toml_02152026:max_total_connections = 30000
-deployment.toml_03292026:MaxRoleNameListLength = "30000"
-deployment.toml_03292026:max_total_connections = 30000
-deployment.toml_08052025:max_total_connections = 30000
-deployment.toml_08072025:MaxRoleNameListLength = "30000"
-deployment.toml_08072025:max_total_connections = 30000
-deployment.toml_08082025:MaxRoleNameListLength = "30000"
-deployment.toml_08082025:max_total_connections = 30000
-deployment.toml_08312025:MaxRoleNameListLength = "30000"
-deployment.toml_08312025:max_total_connections = 30000
-deployment.toml_09112025:MaxRoleNameListLength = "30000"
-deployment.toml_09112025:max_total_connections = 30000
-deployment.toml_11022025:MaxRoleNameListLength = "30000"
-deployment.toml_11022025:max_total_connections = 30000
-deployment.toml_12102025:MaxRoleNameListLength = "30000"
-deployment.toml_12102025:max_total_connections = 30000
-deployment.toml_12152025:MaxRoleNameListLength = "30000"
-deployment.toml_12152025:max_total_connections = 30000
-deployment.toml_17082024:MaxRoleNameListLength = "30000"
-deployment.toml_17082024:max_total_connections = 30000
-deployment.toml_backup_08072025:MaxRoleNameListLength = "30000"
-deployment.toml_backup_08072025:max_total_connections = 30000
-deployment.toml_mockprod:max_total_connections = 30000
-event-processor.xml:            <publisherConnectionStatusCheckInterval>30000</publisherConnectionStatusCheckInterval>
-event-processor.xml:            <publisherConnectionStatusCheckInterval>30000</publisherConnectionStatusCheckInterval>
-identity/identity.xml:        <UserResponseTimeout>300000</UserResponseTimeout>
-identity/thrift-authentication.xml:    <ClientTimeout>30000</ClientTimeout>
-passthru-http.properties:expected_max_queueing_time_for_message_discard_worker=30000
-passthru-http.properties:expected_max_queueing_time=30000
-solr/solr.xml:    <int name="zkClientTimeout">${zkClientTimeout:30000}</int>
-thrift-authentication.xml:    <ClientTimeout>30000</ClientTimeout>
-user-mgt.xml:            <Property name="MaxRoleNameListLength">30000</Property>
+    <!-- This will give out the timout of the configuration contexts, in milliseconds -->
+    <parameter name="ConfigContextTimeoutInterval" locked="false">30000</parameter>
+
+    <!-- Synapse Configuration file location relative to CARBON_HOME -->
+    <parameter name="SynapseConfig.ConfigurationFile" locked="false">repository/deployment/server/synapse-configs</parameter>
+    <!-- Synapse Home parameter -->
+    <parameter name="SynapseConfig.HomeDirectory" locked="false">.</parameter>
+    <!-- Resolve root used to resolve synapse references like schemas inside a WSDL -->
+    <parameter name="SynapseConfig.ResolveRoot" locked="false">.</parameter>
+    <!-- Synapse Server name parameter -->
+    <parameter name="SynapseConfig.ServerName" locked="false">localhost</parameter>
