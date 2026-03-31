@@ -1,9 +1,16 @@
 SELECT 
-    r.REG_PATH_ID,
-    r.REG_FULL_PATH,
-    r.REG_NAME,
-    CAST(c.REG_CONTENT AS CLOB) AS SEQUENCE_CONTENT
-FROM REG_RESOURCE r
-LEFT JOIN REG_RESOURCE_CONTENT c ON r.REG_PATH_ID = c.REG_PATH_ID
-WHERE r.REG_PATH_ID = 10543031
-   OR r.REG_FULL_PATH = '/_system/governance/apimgt/customsequences/in/Imaging_FCM_routing_flow_in_v3_update.xml';
+  r.reg_content_id,
+  r.reg_uuid,
+  r.reg_name,
+  r.reg_media_type,
+  p.reg_path_value,
+  r.reg_last_updated_time
+FROM coct42_reg.reg_resource r
+JOIN coct42_reg.reg_path p
+  ON r.reg_path_id = p.reg_path_id
+WHERE r.reg_name like '%Imaging_FCM_routing_flow_in_v3_update%'
+  --AND p.reg_path_value LIKE '%Transfer%'
+   --p.reg_path_value LIKE '%57acd129-630a-4455-9282-07080b848855%'
+  --AND p.reg_path_value  LIKE '%Billpay%'
+  --AND r.reg_tenant_id = 12
+ORDER BY r.reg_last_updated_time DESC;
