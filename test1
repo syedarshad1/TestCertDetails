@@ -1,30 +1,57 @@
-TID: [-1] [] [2026-03-31 09:27:29,632] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  WARN {org.apache.synapse.endpoints.EndpointContext} - Suspending endpoint : FISContentManagement--vv3_APIproductionEndpoint  - current suspend duration is : 30000ms - Next retry after : Tue Mar 31 09:27:59 CDT 2026
-
-TID: [-1] [] [2026-03-31 09:27:29,632] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {org.apache.synapse.endpoints.EndpointContext} - Endpoint : FISContentManagement--vv3_APIproductionEndpoint  has been marked for SUSPENSION, but no further retries remain. Thus it will be SUSPENDED.
-
-TID: [-1] [] [2026-03-31 09:27:29,632] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  WARN {org.apache.synapse.core.axis2.TimeoutHandler} - Expiring message ID : urn:uuid:2128a637-eb0f-4b8e-aac7-f42ef8fdde6f; dropping message after GLOBAL_TIMEOUT of : 120 seconds for Endpoint [FISContentManagement--vv3_APIproductionEndpoint], URI : https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, Received through API : FISContentManagement:vv3 Correlation ID : 9c9c209e-90cf-46a2-96f4-71766392d264
-
-TID: [-1] [] [2026-03-31 09:12:26,801]   WARN {org.apache.synapse.transport.passthru.TargetHandler} - ERROR_CODE = 101504, STATE_DESCRIPTION = Socket Timeout occurred after Server written the request headers and the request body to the backend, INTERNAL_STATE = REQUEST_DONE, DIRECTION = REQUEST, CAUSE_OF_ERROR = Connection between the WSO2 Server and the BackEnd timeouts, TARGET_HOST = 170.132.180.158, TARGET_PORT = 443, TARGET_CONTEXT = https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, HTTP_METHOD = POST, TRIGGER_TYPE = api, TRIGGER_NAME = FISContentManagement:vv3, REMOTE_ADDRESS = icapilr9.fisglobal.com/170.132.180.158:443, CONNECTION = http-outgoing-2514185, SOCKET_TIMEOUT = 179000, CORRELATION_ID = ed9e24ab-0b66-4acc-8449-8eabf890eaa8
-
-TID: [-1] [] [2026-03-31 09:11:29,612] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {org.apache.synapse.mediators.builtin.LogMediator} - {api:FISContentManagement:vv3} STATUS = Executing default 'fault' sequence, ERROR_CODE = 101504, ERROR_MESSAGE = Send timeout
-
-TID: [-1] [] [2026-03-31 09:11:29,612] 308b2fb9-4cb9-4462-a4f5-9735c6c5049b  WARN {org.apache.synapse.core.axis2.TimeoutHandler} - Expiring message ID : urn:uuid:24eb7c8c-7dc9-4298-b20a-ab70d6395387; dropping message after GLOBAL_TIMEOUT of : 120 seconds for Endpoint [FISContentManagement--vv3_APIproductionEndpoint], URI : https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, Received through API : FISContentManagement:vv3 Correlation ID : ed9e24ab-0b66-4acc-8449-8eabf890eaa8
-
-TID: [-1234] [] [2026-03-31 09:09:27,610] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {TRACE_LOGGER} - {api:FISContentManagement:vv3} End : Sequence <Imaging_FCM_routing_flow_in_v3_update>
-
-TID: [-1234] [] [2026-03-31 09:09:27,608] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {org.apache.synapse.mediators.builtin.LogMediator} - {api:FISContentManagement:vv3} entity_id_log = https://icapilr9.fisglobal.com/FCMAPI
-
-TID: [-1234] [] [2026-03-31 09:09:27,595] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {TRACE_LOGGER} - {api:FISContentManagement:vv3} Mediation started from mediator position : 0
-
-TID: [-1234] [] [2026-03-31 09:09:27,595] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {TRACE_LOGGER} - {api:FISContentManagement:vv3} Sequence <SequenceMediator> :: mediate()
-
-TID: [-1234] [] [2026-03-31 09:09:27,595] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {TRACE_LOGGER} - {api:FISContentManagement:vv3} Start : Sequence <Imaging_FCM_routing_flow_in_v3_update>
-
-TID: [-1234] [] [2026-03-31 09:09:27,595] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {org.apache.synapse.mediators.builtin.LogMediator} - {api:FISContentManagement:vv3} CLIENT_DATA = null, APPLICATION_ID_CLIENT = 57269, CONSUMER_KEY_CLIENT = WJf03fAfC4fNoDNThaH3VuKUY20a, uuid = 7a38862a027ea04ca90bc570540b3ce9, CLIENT_CERT = null, CLIENT_CIPHER = null
-
-but do not see any suspension logic defined in api config or in any sequence file or endpoint file
-
-API_NAME	API_UUID	API_VERSION	CONTEXT	ORGANIZATION	REG_LAST_UPDATED_TIME	ENDPOINTCONFIG	INSEQUENCE_NAME	INSEQUENCE_CONTENT	OUTSEQUENCE_NAME	OUTSEQUENCE_CONTENT	FAULTSEQUENCE_NAME	FAULTSEQUENCE_CONTENT	IN_PATH_REG_NAME	INSEQUENCE_REG_PATH	OUT_PATH_REG_NAME	OUTSEQUENCE_REG_PATH	FAULT_PATH_REG_NAME	FAULTSEQUENCE_REG_PATH	FOUNDSUSPEND	SUSPENDFILENAME	FOUNDENDPOINT	ENDPOINTFILENAME	SUSPENSIONSTATUS	ACTIONDURATION_VALUE
-FISContentManagement	57acd129-630a-4455-9282-07080b848855	v3	/api/image-solutions/fis-content-management/v3	carbon.super	03-MAR-26 10.24.44.892000000 PM	{"endpoint_type":"default","sandbox_endpoints":{"url":"default"},"production_endpoints":{"url":"default"}}													No		No		NoSuspensionDefined - Endpoint will timeout at 179000ms	
-
-Do you know how we can check which default configuration is picking and suspending the endpoint for 30000ms
+$ grep -r '30000' *
+axis2/axis2.xml:    <parameter name="ConfigContextTimeoutInterval" locked="false">30000</parameter>
+axis2/axis2.xml:    <!--<transaction timeout="30000">
+axis2/axis2_ControlPlane.xml:    <parameter name="ConfigContextTimeoutInterval" locked="false">30000</parameter>
+axis2/axis2_ControlPlane.xml:    <!--<transaction timeout="30000">
+axis2/axis2_KM.xml:    <parameter name="ConfigContextTimeoutInterval" locked="false">30000</parameter>
+axis2/axis2_KM.xml:    <!--<transaction timeout="30000">
+axis2/axis2_blocking_client.xml:    <parameter name="ConfigContextTimeoutInterval">30000</parameter>
+axis2/axis2_client.xml:    <parameter name="maxTotalConnections">30000</parameter>
+carbon.xml:        <ServiceGroupContextIdleTime>30000</ServiceGroupContextIdleTime>
+data-bridge/data-agent-config.xml:        <SocketTimeoutMS>30000</SocketTimeoutMS>
+data-bridge/data-agent-config.xml:        <SocketTimeoutMS>30000</SocketTimeoutMS>
+datasources/master-datasources.xml:                    <validationInterval>30000</validationInterval>
+datasources/master-datasources.xml:                    <validationInterval>30000</validationInterval>
+datasources/master-datasources.xml:                    <validationInterval>30000</validationInterval>
+datasources/master-datasources.xml:                    <validationInterval>30000</validationInterval>
+datasources/metrics-datasources.xml:                    <validationInterval>30000</validationInterval>
+datasources/metrics-datasources.xml:                    <validationInterval>30000</validationInterval>
+datasources/metrics-datasources.xml:                    <validationInterval>30000</validationInterval>
+datasources/metrics-datasources.xml:                    <validationInterval>30000</validationInterval>
+deployment.toml:MaxRoleNameListLength = "30000"
+deployment.toml:max_total_connections = 30000
+deployment.toml_01302026:MaxRoleNameListLength = "30000"
+deployment.toml_01302026:max_total_connections = 30000
+deployment.toml_02152026:MaxRoleNameListLength = "30000"
+deployment.toml_02152026:max_total_connections = 30000
+deployment.toml_03292026:MaxRoleNameListLength = "30000"
+deployment.toml_03292026:max_total_connections = 30000
+deployment.toml_08052025:max_total_connections = 30000
+deployment.toml_08072025:MaxRoleNameListLength = "30000"
+deployment.toml_08072025:max_total_connections = 30000
+deployment.toml_08082025:MaxRoleNameListLength = "30000"
+deployment.toml_08082025:max_total_connections = 30000
+deployment.toml_08312025:MaxRoleNameListLength = "30000"
+deployment.toml_08312025:max_total_connections = 30000
+deployment.toml_09112025:MaxRoleNameListLength = "30000"
+deployment.toml_09112025:max_total_connections = 30000
+deployment.toml_11022025:MaxRoleNameListLength = "30000"
+deployment.toml_11022025:max_total_connections = 30000
+deployment.toml_12102025:MaxRoleNameListLength = "30000"
+deployment.toml_12102025:max_total_connections = 30000
+deployment.toml_12152025:MaxRoleNameListLength = "30000"
+deployment.toml_12152025:max_total_connections = 30000
+deployment.toml_17082024:MaxRoleNameListLength = "30000"
+deployment.toml_17082024:max_total_connections = 30000
+deployment.toml_backup_08072025:MaxRoleNameListLength = "30000"
+deployment.toml_backup_08072025:max_total_connections = 30000
+deployment.toml_mockprod:max_total_connections = 30000
+event-processor.xml:            <publisherConnectionStatusCheckInterval>30000</publisherConnectionStatusCheckInterval>
+event-processor.xml:            <publisherConnectionStatusCheckInterval>30000</publisherConnectionStatusCheckInterval>
+identity/identity.xml:        <UserResponseTimeout>300000</UserResponseTimeout>
+identity/thrift-authentication.xml:    <ClientTimeout>30000</ClientTimeout>
+passthru-http.properties:expected_max_queueing_time_for_message_discard_worker=30000
+passthru-http.properties:expected_max_queueing_time=30000
+solr/solr.xml:    <int name="zkClientTimeout">${zkClientTimeout:30000}</int>
+thrift-authentication.xml:    <ClientTimeout>30000</ClientTimeout>
+user-mgt.xml:            <Property name="MaxRoleNameListLength">30000</Property>
