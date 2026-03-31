@@ -1,4 +1,23 @@
--- Condition 5: FoundSuspend=Yes BUT NOT in endpointConfig AND inSequence_content has <initailDuration>0</initailDuration>
+CASE 
+        -- Condition 1
+        WHEN INSTR(b.endpointConfig, '"suspendDuration"') > 0
+        AND (
+            INSTR(b.endpointConfig, '"suspendDuration":""') > 0
+            OR INSTR(b.endpointConfig, '"suspendDuration":"0"') > 0
+        )
+        AND INSTR(b.endpointConfig, '"actionDuration"') = 0
+        THEN 'SuspensionDisabled - Endpoint will timeout at 179000ms'
+        
+        -- Condition 2
+        WHEN INSTR(b.endpointConfig, '"suspendDuration"') > 0
+        AND (
+            INSTR(b.endpointConfig, '"suspendDuration":""') > 0
+            OR INSTR(b.endpointConfig, '"suspendDuration":"0"') > 0
+        )
+        AND INSTR(b.endpointConfig, '"actionDuration"') > 0
+        THEN 'SuspensionDisabled - Endpoint will timeout based on actionDuration'
+        
+        -- Condition 3: FoundSuspend=Yes BUT NOT in endpointConfig
         WHEN INSTR(LOWER(NVL(b.endpointConfig, ' ')), 'suspend') = 0
         AND (
             (b.inSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'suspend'), 0) > 0)
@@ -8,12 +27,41 @@
             OR (b.outSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'suspend'), 0) > 0)
             OR (b.faultSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'suspend'), 0) > 0)
         )
-        AND (
-            (b.inSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.inSequence_content, '<initailDuration>0</initailDuration>'), 0) > 0)
-            OR (b.outSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.outSequence_content, '<initailDuration>0</initailDuration>'), 0) > 0)
-            OR (b.faultSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.faultSequence_content, '<initailDuration>0</initailDuration>'), 0) > 0)
-            OR (b.inSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.inSequence_reg_path, '<initailDuration>0</initailDuration>'), 0) > 0)
-            OR (b.outSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.outSequence_reg_path, '<initailDuration>0</initailDuration>'), 0) > 0)
-            OR (b.faultSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.faultSequence_reg_path, '<initailDuration>0</initailDuration>'), 0) > 0)
-        )
-        THEN 'SuspensionDisabled - ThroughSequenceFile - Endpoint will timeout at 179000ms'
+        THEN 'ManualCheckRequiredInSequenceFile'
+        
+        -- Condition 4: FoundSuspend=No AND FoundEndpoint=No
+        WHEN INSTR(LOWER(NVL(b.endpointConfig, ' ')), 'suspend') = 0
+          AND (b.inSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'suspend'), 0) = 0)
+          AND (b.outSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'suspend'), 0) = 0)
+          AND (b.faultSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'suspend'), 0) = 0)
+          AND (b.inSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'suspend'), 0) = 0)
+          AND (b.outSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'suspend'), 0) = 0)
+          AND (b.faultSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'suspend'), 0) = 0)
+          AND (b.inSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'endpoint'), 0) = 0)
+          AND (b.outSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'endpoint'), 0) = 0)
+          AND (b.faultSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'endpoint'), 0) = 0)
+          AND (b.inSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'endpoint'), 0) = 0)
+          AND (b.outSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'endpoint'), 0) = 0)
+          AND (b.faultSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'endpoint'), 0) = 0)
+        THEN 'NoSuspensionDefined - Endpoint will timeout at 179000ms'
+        
+        -- Condition 5: FoundSuspend=No AND FoundEndpoint=Yes
+        WHEN INSTR(LOWER(NVL(b.endpointConfig, ' ')), 'suspend') = 0
+          AND (b.inSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'suspend'), 0) = 0)
+          AND (b.outSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'suspend'), 0) = 0)
+          AND (b.faultSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'suspend'), 0) = 0)
+          AND (b.inSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'suspend'), 0) = 0)
+          AND (b.outSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'suspend'), 0) = 0)
+          AND (b.faultSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'suspend'), 0) = 0)
+          AND (
+            (b.inSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'endpoint'), 0) > 0)
+            OR (b.outSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'endpoint'), 0) > 0)
+            OR (b.faultSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'endpoint'), 0) > 0)
+            OR (b.inSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'endpoint'), 0) > 0)
+            OR (b.outSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'endpoint'), 0) > 0)
+            OR (b.faultSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'endpoint'), 0) > 0)
+          )
+        THEN 'ManualCheckRequiredInEndpointXML'
+        
+        ELSE NULL
+    END AS SuspensionStatus,
