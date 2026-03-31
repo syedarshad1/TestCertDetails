@@ -1,17 +1,19 @@
-ELSE NULL
-    END AS SuspensionStatus,
-    
-    -- actionDuration value extracted
-    CASE 
-        WHEN INSTR(b.endpointConfig, '"actionDuration":"') > 0
-        THEN SUBSTR(
-            b.endpointConfig,
-            INSTR(b.endpointConfig, '"actionDuration":"') + 18,
-            INSTR(b.endpointConfig, '"', INSTR(b.endpointConfig, '"actionDuration":"') + 18) 
-            - (INSTR(b.endpointConfig, '"actionDuration":"') + 18)
+-- Condition 5: FoundSuspend=Yes BUT NOT in endpointConfig AND inSequence_content has <initailDuration>0</initailDuration>
+        WHEN INSTR(LOWER(NVL(b.endpointConfig, ' ')), 'suspend') = 0
+        AND (
+            (b.inSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'suspend'), 0) > 0)
+            OR (b.outSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'suspend'), 0) > 0)
+            OR (b.faultSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'suspend'), 0) > 0)
+            OR (b.inSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'suspend'), 0) > 0)
+            OR (b.outSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'suspend'), 0) > 0)
+            OR (b.faultSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'suspend'), 0) > 0)
         )
-        ELSE NULL
-    END AS actionDuration_value
-
-FROM base_data b
-ORDER BY b.reg_last_updated_time DESC;
+        AND (
+            (b.inSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.inSequence_content, '<initailDuration>0</initailDuration>'), 0) > 0)
+            OR (b.outSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.outSequence_content, '<initailDuration>0</initailDuration>'), 0) > 0)
+            OR (b.faultSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.faultSequence_content, '<initailDuration>0</initailDuration>'), 0) > 0)
+            OR (b.inSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.inSequence_reg_path, '<initailDuration>0</initailDuration>'), 0) > 0)
+            OR (b.outSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.outSequence_reg_path, '<initailDuration>0</initailDuration>'), 0) > 0)
+            OR (b.faultSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.faultSequence_reg_path, '<initailDuration>0</initailDuration>'), 0) > 0)
+        )
+        THEN 'SuspensionDisabled - ThroughSequenceFile - Endpoint will timeout at 179000ms'
