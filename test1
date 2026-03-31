@@ -1,11 +1,24 @@
-    <!-- This will give out the timout of the configuration contexts, in milliseconds -->
-    <parameter name="ConfigContextTimeoutInterval" locked="false">30000</parameter>
+	
+TID: [-1234] [] [2026-03-31 09:09:27,595] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {org.apache.synapse.mediators.builtin.LogMediator} - {api:FISContentManagement:vv3} CLIENT_DATA = null, APPLICATION_ID_CLIENT = 57269, CONSUMER_KEY_CLIENT = WJf03fAfC4fNoDNThaH3VuKUY20a, uuid = 7a38862a027ea04ca90bc570540b3ce9, CLIENT_CERT = null, CLIENT_CIPHER = null
 
-    <!-- Synapse Configuration file location relative to CARBON_HOME -->
-    <parameter name="SynapseConfig.ConfigurationFile" locked="false">repository/deployment/server/synapse-configs</parameter>
-    <!-- Synapse Home parameter -->
-    <parameter name="SynapseConfig.HomeDirectory" locked="false">.</parameter>
-    <!-- Resolve root used to resolve synapse references like schemas inside a WSDL -->
-    <parameter name="SynapseConfig.ResolveRoot" locked="false">.</parameter>
-    <!-- Synapse Server name parameter -->
-    <parameter name="SynapseConfig.ServerName" locked="false">localhost</parameter>
+TID: [-1234] [] [2026-03-31 09:09:27,595] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {TRACE_LOGGER} - {api:FISContentManagement:vv3} Start : Sequence <Imaging_FCM_routing_flow_in_v3_update>
+
+TID: [-1234] [] [2026-03-31 09:09:27,595] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {TRACE_LOGGER} - {api:FISContentManagement:vv3} Sequence <SequenceMediator> :: mediate()
+
+TID: [-1234] [] [2026-03-31 09:09:27,595] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {TRACE_LOGGER} - {api:FISContentManagement:vv3} Mediation started from mediator position : 0
+
+TID: [-1234] [] [2026-03-31 09:09:27,608] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {org.apache.synapse.mediators.builtin.LogMediator} - {api:FISContentManagement:vv3} entity_id_log = https://icapilr9.fisglobal.com/FCMAPI
+
+TID: [-1234] [] [2026-03-31 09:09:27,610] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {TRACE_LOGGER} - {api:FISContentManagement:vv3} End : Sequence <Imaging_FCM_routing_flow_in_v3_update>
+
+TID: [-1] [] [2026-03-31 09:11:29,612] 308b2fb9-4cb9-4462-a4f5-9735c6c5049b  WARN {org.apache.synapse.core.axis2.TimeoutHandler} - Expiring message ID : urn:uuid:24eb7c8c-7dc9-4298-b20a-ab70d6395387; dropping message after GLOBAL_TIMEOUT of : 120 seconds for Endpoint [FISContentManagement--vv3_APIproductionEndpoint], URI : https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, Received through API : FISContentManagement:vv3 Correlation ID : ed9e24ab-0b66-4acc-8449-8eabf890eaa8
+
+TID: [-1] [] [2026-03-31 09:11:29,612] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {org.apache.synapse.mediators.builtin.LogMediator} - {api:FISContentManagement:vv3} STATUS = Executing default 'fault' sequence, ERROR_CODE = 101504, ERROR_MESSAGE = Send timeout
+
+TID: [-1] [] [2026-03-31 09:12:26,801]   WARN {org.apache.synapse.transport.passthru.TargetHandler} - ERROR_CODE = 101504, STATE_DESCRIPTION = Socket Timeout occurred after Server written the request headers and the request body to the backend, INTERNAL_STATE = REQUEST_DONE, DIRECTION = REQUEST, CAUSE_OF_ERROR = Connection between the WSO2 Server and the BackEnd timeouts, TARGET_HOST = 170.132.180.158, TARGET_PORT = 443, TARGET_CONTEXT = https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, HTTP_METHOD = POST, TRIGGER_TYPE = api, TRIGGER_NAME = FISContentManagement:vv3, REMOTE_ADDRESS = icapilr9.fisglobal.com/170.132.180.158:443, CONNECTION = http-outgoing-2514185, SOCKET_TIMEOUT = 179000, CORRELATION_ID = ed9e24ab-0b66-4acc-8449-8eabf890eaa8
+
+TID: [-1] [] [2026-03-31 09:27:29,632] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  WARN {org.apache.synapse.core.axis2.TimeoutHandler} - Expiring message ID : urn:uuid:2128a637-eb0f-4b8e-aac7-f42ef8fdde6f; dropping message after GLOBAL_TIMEOUT of : 120 seconds for Endpoint [FISContentManagement--vv3_APIproductionEndpoint], URI : https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, Received through API : FISContentManagement:vv3 Correlation ID : 9c9c209e-90cf-46a2-96f4-71766392d264
+
+TID: [-1] [] [2026-03-31 09:27:29,632] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {org.apache.synapse.endpoints.EndpointContext} - Endpoint : FISContentManagement--vv3_APIproductionEndpoint  has been marked for SUSPENSION, but no further retries remain. Thus it will be SUSPENDED.
+
+TID: [-1] [] [2026-03-31 09:27:29,632] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  WARN {org.apache.synapse.endpoints.EndpointContext} - Suspending endpoint : FISContentManagement--vv3_APIproductionEndpoint  - current suspend duration is : 30000ms - Next retry after : Tue Mar 31 09:27:59 CDT 2026
