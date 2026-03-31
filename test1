@@ -1,20 +1,30 @@
-fasting, glucose 3 hour (F) mg/dL
-96 Range[65-95]
+TID: [-1] [] [2026-03-31 09:27:29,632] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  WARN {org.apache.synapse.endpoints.EndpointContext} - Suspending endpoint : FISContentManagement--vv3_APIproductionEndpoint  - current suspend duration is : 30000ms - Next retry after : Tue Mar 31 09:27:59 CDT 2026
 
-1H, glucose 3 hour (1M) mg/dL
-185 Range[65-180]
+TID: [-1] [] [2026-03-31 09:27:29,632] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {org.apache.synapse.endpoints.EndpointContext} - Endpoint : FISContentManagement--vv3_APIproductionEndpoint  has been marked for SUSPENSION, but no further retries remain. Thus it will be SUSPENDED.
 
-2H, glucose 3 hour (2M) mg/dL
-149 Range[65-155]
+TID: [-1] [] [2026-03-31 09:27:29,632] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  WARN {org.apache.synapse.core.axis2.TimeoutHandler} - Expiring message ID : urn:uuid:2128a637-eb0f-4b8e-aac7-f42ef8fdde6f; dropping message after GLOBAL_TIMEOUT of : 120 seconds for Endpoint [FISContentManagement--vv3_APIproductionEndpoint], URI : https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, Received through API : FISContentManagement:vv3 Correlation ID : 9c9c209e-90cf-46a2-96f4-71766392d264
 
-3H, glucose 3 hour (3M) mg/dL
-90 Range[65-140]
+TID: [-1] [] [2026-03-31 09:12:26,801]   WARN {org.apache.synapse.transport.passthru.TargetHandler} - ERROR_CODE = 101504, STATE_DESCRIPTION = Socket Timeout occurred after Server written the request headers and the request body to the backend, INTERNAL_STATE = REQUEST_DONE, DIRECTION = REQUEST, CAUSE_OF_ERROR = Connection between the WSO2 Server and the BackEnd timeouts, TARGET_HOST = 170.132.180.158, TARGET_PORT = 443, TARGET_CONTEXT = https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, HTTP_METHOD = POST, TRIGGER_TYPE = api, TRIGGER_NAME = FISContentManagement:vv3, REMOTE_ADDRESS = icapilr9.fisglobal.com/170.132.180.158:443, CONNECTION = http-outgoing-2514185, SOCKET_TIMEOUT = 179000, CORRELATION_ID = ed9e24ab-0b66-4acc-8449-8eabf890eaa8
 
-Carpenter/Coustan Scale: (Must have at least TWO elevated values) Fasting >/= 95 1 hour >/=180 2 hour >/=155 3 hour >/=140 National Diabetes Data Group versus Carpenter-Coustan Criteria to Diagnose Gestational Diabetes. Am J Obstet Gynecol. 2011 September ; 205(3): 253.e1a??253.e7. doi:10.1016/j.ajog.2011.06.026.
+TID: [-1] [] [2026-03-31 09:11:29,612] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {org.apache.synapse.mediators.builtin.LogMediator} - {api:FISContentManagement:vv3} STATUS = Executing default 'fault' sequence, ERROR_CODE = 101504, ERROR_MESSAGE = Send timeout
 
-fasting is just 1 point above range
-1h is 5 point above
-2h came in range
-3h came in range
+TID: [-1] [] [2026-03-31 09:11:29,612] 308b2fb9-4cb9-4462-a4f5-9735c6c5049b  WARN {org.apache.synapse.core.axis2.TimeoutHandler} - Expiring message ID : urn:uuid:24eb7c8c-7dc9-4298-b20a-ab70d6395387; dropping message after GLOBAL_TIMEOUT of : 120 seconds for Endpoint [FISContentManagement--vv3_APIproductionEndpoint], URI : https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, Received through API : FISContentManagement:vv3 Correlation ID : ed9e24ab-0b66-4acc-8449-8eabf890eaa8
 
-Is this matter of concern or just need to maitian the sugar level my eating white rice less, current consuming 2 times only white rice (lunch and dinner)
+TID: [-1234] [] [2026-03-31 09:09:27,610] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {TRACE_LOGGER} - {api:FISContentManagement:vv3} End : Sequence <Imaging_FCM_routing_flow_in_v3_update>
+
+TID: [-1234] [] [2026-03-31 09:09:27,608] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {org.apache.synapse.mediators.builtin.LogMediator} - {api:FISContentManagement:vv3} entity_id_log = https://icapilr9.fisglobal.com/FCMAPI
+
+TID: [-1234] [] [2026-03-31 09:09:27,595] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {TRACE_LOGGER} - {api:FISContentManagement:vv3} Mediation started from mediator position : 0
+
+TID: [-1234] [] [2026-03-31 09:09:27,595] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {TRACE_LOGGER} - {api:FISContentManagement:vv3} Sequence <SequenceMediator> :: mediate()
+
+TID: [-1234] [] [2026-03-31 09:09:27,595] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {TRACE_LOGGER} - {api:FISContentManagement:vv3} Start : Sequence <Imaging_FCM_routing_flow_in_v3_update>
+
+TID: [-1234] [] [2026-03-31 09:09:27,595] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  INFO {org.apache.synapse.mediators.builtin.LogMediator} - {api:FISContentManagement:vv3} CLIENT_DATA = null, APPLICATION_ID_CLIENT = 57269, CONSUMER_KEY_CLIENT = WJf03fAfC4fNoDNThaH3VuKUY20a, uuid = 7a38862a027ea04ca90bc570540b3ce9, CLIENT_CERT = null, CLIENT_CIPHER = null
+
+but do not see any suspension logic defined in api config or in any sequence file or endpoint file
+
+API_NAME	API_UUID	API_VERSION	CONTEXT	ORGANIZATION	REG_LAST_UPDATED_TIME	ENDPOINTCONFIG	INSEQUENCE_NAME	INSEQUENCE_CONTENT	OUTSEQUENCE_NAME	OUTSEQUENCE_CONTENT	FAULTSEQUENCE_NAME	FAULTSEQUENCE_CONTENT	IN_PATH_REG_NAME	INSEQUENCE_REG_PATH	OUT_PATH_REG_NAME	OUTSEQUENCE_REG_PATH	FAULT_PATH_REG_NAME	FAULTSEQUENCE_REG_PATH	FOUNDSUSPEND	SUSPENDFILENAME	FOUNDENDPOINT	ENDPOINTFILENAME	SUSPENSIONSTATUS	ACTIONDURATION_VALUE
+FISContentManagement	57acd129-630a-4455-9282-07080b848855	v3	/api/image-solutions/fis-content-management/v3	carbon.super	03-MAR-26 10.24.44.892000000 PM	{"endpoint_type":"default","sandbox_endpoints":{"url":"default"},"production_endpoints":{"url":"default"}}													No		No		NoSuspensionDefined - Endpoint will timeout at 179000ms	
+
+Do you know how we can check which default configuration is picking and suspending the endpoint for 30000ms
