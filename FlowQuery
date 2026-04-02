@@ -1,4 +1,6 @@
-    <parameter name="ConfigContextTimeoutInterval" locked="false">30000</parameter>
+/opt/codeconnect/wso2am-4.2.0-gw/repository/conf/axis2
+
+<parameter name="ConfigContextTimeoutInterval" locked="false">30000</parameter>
 
     <!-- Synapse Configuration file location relative to CARBON_HOME -->
     <parameter name="SynapseConfig.ConfigurationFile" locked="false">repository/deployment/server/synapse-configs</parameter>
@@ -11,3 +13,6 @@
 
     <!-- Configuration to include full Security Exception Message -->
     <parameter name="includeFullWSSecurityExceptionMessage" locked="false">true</parameter>
+
+
+TID: [-1] [] [2026-03-31 09:11:29,612] 308b2fb9-4cb9-4462-a4f5-9735c6c5049b  WARN {org.apache.synapse.core.axis2.TimeoutHandler} - Expiring message ID : urn:uuid:24eb7c8c-7dc9-4298-b20a-ab70d6395387; dropping message after GLOBAL_TIMEOUT of : 120 seconds for Endpoint [FISContentManagement--vv3_APIproductionEndpoint], URI : https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, Received through API : FISContentManagement:vv3 Correlation ID : ed9e24ab-0b66-4acc-8449-8eabf890eaa8
