@@ -351,28 +351,31 @@ SELECT
              THEN ',faultSequence_reg_path(' || NVL(b.fault_path_reg_name, 'N/A') || ')' ELSE '' END
     ) AS EndpointFileName,
     
--- SuspensionStatus
+-- SuspensionStatus - UPDATED WITH CORRECT TIMEOUT BEHAVIOR
 CASE 
          
-        -- Condition 1
+        -- Condition 1: suspendDuration=0, NO actionDuration
+        -- When suspension is disabled and no custom timeout: falls back to global_timeout (120 sec)
         WHEN INSTR(b.endpointConfig, '"suspendDuration"') > 0
         AND (
             INSTR(b.endpointConfig, '"suspendDuration":""') > 0
             OR INSTR(b.endpointConfig, '"suspendDuration":"0"') > 0
         )
         AND INSTR(b.endpointConfig, '"actionDuration"') = 0
-        THEN 'SuspensionDisabled - Endpoint will timeout at 179000ms'
+        THEN 'SuspensionDisabled - Endpoint will not suspend, Endpoint will timeout at 120 secs (global_timeout)'
         
-        -- Condition 2
+        -- Condition 2: suspendDuration=0, WITH actionDuration
+        -- When suspension is disabled but custom timeout is set: uses actionDuration
         WHEN INSTR(b.endpointConfig, '"suspendDuration"') > 0
         AND (
             INSTR(b.endpointConfig, '"suspendDuration":""') > 0
             OR INSTR(b.endpointConfig, '"suspendDuration":"0"') > 0
         )
         AND INSTR(b.endpointConfig, '"actionDuration"') > 0
-        THEN 'SuspensionDisabled - Endpoint will timeout based on actionDuration'
+        THEN 'SuspensionDisabled - Endpoint will not suspend, Endpoint will timeout based on actionDuration'
         
         -- Condition 3: FoundSuspend=Yes BUT NOT in endpointConfig
+        -- Suspension logic found in sequence files: requires manual verification
         WHEN INSTR(LOWER(NVL(b.endpointConfig, ' ')), 'suspend') = 0
         AND (
             (b.inSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'suspend'), 0) > 0)
@@ -384,7 +387,8 @@ CASE
         )
         THEN 'ManualCheckRequiredInSequenceFile'
         
-        -- Condition 4: FoundSuspend=No AND FoundEndpoint=No
+        -- Condition 4: FoundSuspend=No AND FoundEndpoint=No (No suspension config at all)
+        -- No suspension logic defined: uses default suspension (30 sec) and global_timeout (120 sec)
         WHEN INSTR(LOWER(NVL(b.endpointConfig, ' ')), 'suspend') = 0
           AND (b.inSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'suspend'), 0) = 0)
           AND (b.outSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'suspend'), 0) = 0)
@@ -398,9 +402,10 @@ CASE
           AND (b.inSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'endpoint'), 0) = 0)
           AND (b.outSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'endpoint'), 0) = 0)
           AND (b.faultSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'endpoint'), 0) = 0)
-        THEN 'NoSuspensionDefined - Endpoint will timeout at 179000ms'
+        THEN 'NoSuspensionDefined - Will use global_timeout 120 secs, default suspension enabled for 30 secs on error'
         
         -- Condition 5: FoundSuspend=No AND FoundEndpoint=Yes
+        -- No suspension in config but endpoint references in sequence: requires manual verification
         WHEN INSTR(LOWER(NVL(b.endpointConfig, ' ')), 'suspend') = 0
           AND (b.inSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'suspend'), 0) = 0)
           AND (b.outSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'suspend'), 0) = 0)
