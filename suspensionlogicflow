@@ -1,0 +1,51 @@
+I  would like to understand the wso2 4.2 suspenenion logic in the form of flow diagram
+
+Some high level config
+
+1: here we diasabled suspension "suspendDuration":"0", endpoint will try till "actionDuration":"60000" 60secs/90secs/30secs and timeout - Is my understanding correct?
+
+{"endpoint_type":"default","sandbox_endpoints":{"template_not_supported":false,"url":"default"},
+"production_endpoints":{"endpoint_type":"default","template_not_supported":false,
+"config":{"suspendDuration":"0","suspendErrorCode":"101503","actionDuration":"60000","factor":"0.0","suspendMaxDuration":"0","actionSelect":"fault"},
+"url":"default"}}
+
+{"endpoint_type":"http","sandbox_endpoints":{"template_not_supported":false,"url":"https:\/\/coct-sandbox.prod.local\/rest\/IBSDLB\/v1"},
+"production_endpoints":{"template_not_supported":false,
+"config":{"suspendDuration":"0","suspendErrorCode":["101503"],"actionDuration":"90000","factor":"0.0","suspendMaxDuration":"0","actionSelect":"fault"},
+"url":"https:\/\/ih-prd.prod.local\/xpressng\/rest\/IBSDLB\/v1"}}
+
+{"endpoint_type":"default","sandbox_endpoints":{"url":"default"},
+"production_endpoints":{
+"config":{"retryDelay":"","actionDuration":"30000","retryTimeOut":"","suspendDuration":"0","suspendErrorCode":[],"retryErroCode":[],"factor":"","suspendMaxDuration":"0","actionSelect":"fault"},
+"url":"default"}}
+
+2: 1: here we diasabled suspension "suspendDuration":"0", with no actionDuration in config - does it use 'http.socket.timeout'=179000 value?
+
+{"endpoint_type":"default","sandbox_endpoints":{"config":{"suspendDuration":"0","suspendErrorCode":["-1"],"suspendMaxDuration":"0"},"url":"default"},
+"production_endpoints":{"config":{"suspendDuration":"0","suspendErrorCode":["-1"],"suspendMaxDuration":"0"},
+"url":"default"}}
+
+3: No suspension logic defined, but still in logs I see it is suspending for 30 secs and timeing out at 120 secs and 179000? which is correct
+
+{"endpoint_type":"http","sandbox_endpoints":{"url":"https:\/\/coct-sandbox.prod.local"},
+"production_endpoints":{"url":"https:\/\/d1-omni-prod-d1-platform-secure-gateway.prod.local\/rest\/pmt\/mmh\/base\/"}}
+
+TID: [-1] [] [2026-03-31 09:12:26,801]   WARN {org.apache.synapse.transport.passthru.TargetHandler} - ERROR_CODE = 101504, 
+STATE_DESCRIPTION = Socket Timeout occurred after Server written the request headers and the request body to the backend, 
+INTERNAL_STATE = REQUEST_DONE, DIRECTION = REQUEST, 
+CAUSE_OF_ERROR = Connection between the WSO2 Server and the BackEnd timeouts, 
+TARGET_HOST = 170.132.180.158, TARGET_PORT = 443, 
+TARGET_CONTEXT = https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, 
+HTTP_METHOD = POST, TRIGGER_TYPE = api, TRIGGER_NAME = FISContentManagement:vv3, 
+REMOTE_ADDRESS = icapilr9.fisglobal.com/170.132.180.158:443, CONNECTION = http-outgoing-2514185, 
+SOCKET_TIMEOUT = 179000, CORRELATION_ID = ed9e24ab-0b66-4acc-8449-8eabf890eaa8
+
+TID: [-1] [] [2026-03-31 09:11:29,612] ed9e24ab-0b66-4acc-8449-8eabf890eaa8  
+INFO {org.apache.synapse.mediators.builtin.LogMediator} - {api:FISContentManagement:vv3} 
+STATUS = Executing default 'fault' sequence, ERROR_CODE = 101504, ERROR_MESSAGE = Send timeout
+
+TID: [-1] [] [2026-03-31 09:11:29,612] 308b2fb9-4cb9-4462-a4f5-9735c6c5049b  WARN {org.apache.synapse.core.axis2.TimeoutHandler} - 
+Expiring message ID : urn:uuid:24eb7c8c-7dc9-4298-b20a-ab70d6395387; 
+dropping message after GLOBAL_TIMEOUT of : 120 seconds for Endpoint [FISContentManagement--vv3_APIproductionEndpoint], 
+URI : https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, 
+Received through API : FISContentManagement:vv3 Correlation ID : ed9e24ab-0b66-4acc-8449-8eabf890eaa8
