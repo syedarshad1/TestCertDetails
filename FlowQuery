@@ -1,18 +1,31 @@
-/opt/codeconnect/wso2am-4.2.0-gw/repository/conf/axis2
+e3016834@lrk1rcdcapiap01 [/opt/codeconnect/wso2am-4.2.0-gw/repository/deployment/server/synapse-configs/default]
+$ ls
+api  inbound-endpoints  registry.xml  sequences  synapse.xml
 
-<parameter name="ConfigContextTimeoutInterval" locked="false">30000</parameter>
+e3016834@lrk1rcdcapiap01 [/opt/codeconnect/wso2am-4.2.0-gw/repository/deployment/server/synapse-configs/default]
+$ cat synapse.xml
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  ~  Copyright (c) 2005-2010, WSO2 Inc. (http://wso2.com) All Rights Reserved.
+  ~
+  ~  WSO2 Inc. licenses this file to you under the Apache License,
+  ~  Version 2.0 (the "License"); you may not use this file except
+  ~  in compliance with the License.
+  ~  You may obtain a copy of the License at
+  ~
+  ~    http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~  Unless required by applicable law or agreed to in writing,
+  ~  software distributed under the License is distributed on an
+  ~  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  ~  KIND, either express or implied.  See the License for the
+  ~  specific language governing permissions and limitations
+  ~  under the License.
+  -->
 
-    <!-- Synapse Configuration file location relative to CARBON_HOME -->
-    <parameter name="SynapseConfig.ConfigurationFile" locked="false">repository/deployment/server/synapse-configs</parameter>
-    <!-- Synapse Home parameter -->
-    <parameter name="SynapseConfig.HomeDirectory" locked="false">.</parameter>
-    <!-- Resolve root used to resolve synapse references like schemas inside a WSDL -->
-    <parameter name="SynapseConfig.ResolveRoot" locked="false">.</parameter>
-    <!-- Synapse Server name parameter -->
-    <parameter name="SynapseConfig.ServerName" locked="false">localhost</parameter>
+<!-- An empty flat synapse configuration shipped with the WSO2 ESB -->
+<definitions xmlns="http://ws.apache.org/ns/synapse">
 
-    <!-- Configuration to include full Security Exception Message -->
-    <parameter name="includeFullWSSecurityExceptionMessage" locked="false">true</parameter>
-
-
-TID: [-1] [] [2026-03-31 09:11:29,612] 308b2fb9-4cb9-4462-a4f5-9735c6c5049b  WARN {org.apache.synapse.core.axis2.TimeoutHandler} - Expiring message ID : urn:uuid:24eb7c8c-7dc9-4298-b20a-ab70d6395387; dropping message after GLOBAL_TIMEOUT of : 120 seconds for Endpoint [FISContentManagement--vv3_APIproductionEndpoint], URI : https://icapilr9.fisglobal.com/FCMAPI/statements/retrieve, Received through API : FISContentManagement:vv3 Correlation ID : ed9e24ab-0b66-4acc-8449-8eabf890eaa8
+    <!-- You can add any flat sequences, endpoints, etc.. to this synapse.xml file if you do
+    *not* want to keep the artifacts in several files -->
+</definitions>
