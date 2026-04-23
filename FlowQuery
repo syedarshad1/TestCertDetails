@@ -1,35 +1,444 @@
-$ cat synapse.properties
-#
-#  Copyright (c) 2005-2010, WSO2 Inc. (http://wso2.com) All Rights Reserved.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#        http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-#
+WITH blob_to_clob AS (
+    SELECT 
+        a.API_NAME,
+        a.API_UUID,
+        a.API_VERSION,
+        a.CONTEXT,
+        a.ORGANIZATION,
+        a.REVISIONS_CREATED,
+        r.reg_content_id,
+        r.reg_last_updated_time,
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 1))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 2001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 4001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 6001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 8001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 10001))) ||
+        TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c.reg_content_data, 2000, 12001))) AS full_xml
+    FROM COCT42_AM.AM_API a
+    JOIN coct42_reg.reg_path p
+        ON p.reg_path_value = CASE 
+            WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED
+        END
+    JOIN coct42_reg.reg_resource r
+        ON r.reg_path_id = p.reg_path_id
+        AND r.reg_name = 'api'
+    JOIN coct42_reg.reg_content c
+        ON c.reg_content_id = r.reg_content_id
+),
+tag_positions AS (
+    SELECT 
+        b.*,
+        DBMS_LOB.INSTR(full_xml, '<endpointConfig>') AS ec_start,
+        DBMS_LOB.INSTR(full_xml, '</endpointConfig>') AS ec_end,
+        DBMS_LOB.INSTR(full_xml, '<inSequence>') AS is_start,
+        DBMS_LOB.INSTR(full_xml, '</inSequence>') AS is_end,
+        DBMS_LOB.INSTR(full_xml, '<outSequence>') AS os_start,
+        DBMS_LOB.INSTR(full_xml, '</outSequence>') AS os_end,
+        DBMS_LOB.INSTR(full_xml, '<faultSequence>') AS fs_start,
+        DBMS_LOB.INSTR(full_xml, '</faultSequence>') AS fs_end
+    FROM blob_to_clob b
+),
+extracted AS (
+    SELECT 
+        API_NAME,
+        API_UUID,
+        API_VERSION,
+        CONTEXT,
+        ORGANIZATION,
+        REVISIONS_CREATED,
+        reg_content_id,
+        reg_last_updated_time,
+        CASE WHEN ec_start > 0 
+             THEN DBMS_LOB.SUBSTR(full_xml, ec_end - ec_start - 16, ec_start + 16) 
+        END AS endpointConfig,
+        CASE WHEN is_start > 0 
+             THEN DBMS_LOB.SUBSTR(full_xml, is_end - is_start - 12, is_start + 12) 
+        END AS inSequence,
+        CASE WHEN os_start > 0 
+             THEN DBMS_LOB.SUBSTR(full_xml, os_end - os_start - 13, os_start + 13) 
+        END AS outSequence,
+        CASE WHEN fs_start > 0 
+             THEN DBMS_LOB.SUBSTR(full_xml, fs_end - fs_start - 15, fs_start + 15) 
+        END AS faultSequence
+    FROM tag_positions
+),
+seq_ref AS (
+    SELECT 
+        CASE 
+            WHEN r_s.reg_name LIKE '%.xml' 
+            THEN SUBSTR(r_s.reg_name, 1, LENGTH(r_s.reg_name) - 4)
+            ELSE r_s.reg_name
+        END AS seq_name_clean,
+        r_s.reg_content_id AS seq_content_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY 
+                CASE 
+                    WHEN r_s.reg_name LIKE '%.xml' 
+                    THEN SUBSTR(r_s.reg_name, 1, LENGTH(r_s.reg_name) - 4)
+                    ELSE r_s.reg_name
+                END
+            ORDER BY r_s.reg_last_updated_time DESC
+        ) AS rn
+    FROM coct42_reg.reg_resource r_s
+    WHERE r_s.reg_media_type IN (
+        'application/vnd.wso2.sequence',
+        'application/xml',
+        'application/octet-stream',
+        'application/json'
+    )
+),
+seq_latest AS (
+    SELECT seq_name_clean, seq_content_id
+    FROM seq_ref
+    WHERE rn = 1
+),
+in_path_ref AS (
+    SELECT 
+        a.API_UUID,
+        r_in.reg_content_id AS in_path_content_id,
+        r_in.reg_name AS in_path_reg_name,
+        ROW_NUMBER() OVER (
+            PARTITION BY a.API_UUID
+            ORDER BY r_in.reg_last_updated_time DESC
+        ) AS rn
+    FROM COCT42_AM.AM_API a
+    JOIN coct42_reg.reg_path p_in
+        ON p_in.reg_path_value = CASE 
+            WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/in'
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED || '/in'
+        END
+    JOIN coct42_reg.reg_resource r_in
+        ON r_in.reg_path_id = p_in.reg_path_id
+        AND r_in.reg_media_type IN ('application/vnd.wso2.sequence','application/xml','application/octet-stream','application/json')
+),
+in_path_latest AS (
+    SELECT API_UUID, in_path_content_id, in_path_reg_name
+    FROM in_path_ref
+    WHERE rn = 1
+),
+out_path_ref AS (
+    SELECT 
+        a.API_UUID,
+        r_out.reg_content_id AS out_path_content_id,
+        r_out.reg_name AS out_path_reg_name,
+        ROW_NUMBER() OVER (
+            PARTITION BY a.API_UUID
+            ORDER BY r_out.reg_last_updated_time DESC
+        ) AS rn
+    FROM COCT42_AM.AM_API a
+    JOIN coct42_reg.reg_path p_out
+        ON p_out.reg_path_value = CASE 
+            WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/out'
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED || '/out'
+        END
+    JOIN coct42_reg.reg_resource r_out
+        ON r_out.reg_path_id = p_out.reg_path_id
+        AND r_out.reg_media_type IN ('application/vnd.wso2.sequence','application/xml','application/octet-stream','application/json')
+),
+out_path_latest AS (
+    SELECT API_UUID, out_path_content_id, out_path_reg_name
+    FROM out_path_ref
+    WHERE rn = 1
+),
+fault_path_ref AS (
+    SELECT 
+        a.API_UUID,
+        r_flt.reg_content_id AS fault_path_content_id,
+        r_flt.reg_name AS fault_path_reg_name,
+        ROW_NUMBER() OVER (
+            PARTITION BY a.API_UUID
+            ORDER BY r_flt.reg_last_updated_time DESC
+        ) AS rn
+    FROM COCT42_AM.AM_API a
+    JOIN coct42_reg.reg_path p_flt
+        ON p_flt.reg_path_value = CASE 
+            WHEN a.REVISIONS_CREATED = 0 
+            THEN '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/fault'
+            ELSE '/_system/governance/apimgt/applicationdata/apis/' || a.API_UUID || '/' || a.REVISIONS_CREATED || '/fault'
+        END
+    JOIN coct42_reg.reg_resource r_flt
+        ON r_flt.reg_path_id = p_flt.reg_path_id
+        AND r_flt.reg_media_type IN ('application/vnd.wso2.sequence','application/xml','application/octet-stream','application/json')
+),
+fault_path_latest AS (
+    SELECT API_UUID, fault_path_content_id, fault_path_reg_name
+    FROM fault_path_ref
+    WHERE rn = 1
+),
+base_data AS (
+    SELECT 
+        e.API_NAME,
+        e.API_UUID,
+        e.API_VERSION,
+        e.CONTEXT,
+        e.ORGANIZATION,
+        e.reg_last_updated_time,
+        e.endpointConfig,
+        
+        e.inSequence AS inSequence_name,
+        CASE 
+            WHEN e.inSequence IS NOT NULL AND isl.seq_content_id IS NOT NULL 
+                THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 1))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 2001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 4001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 6001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 8001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_in.reg_content_data, 2000, 10001)))
+            WHEN e.inSequence IS NOT NULL 
+                THEN TO_CLOB('NOT FOUND')
+            ELSE TO_CLOB(NULL)
+        END AS inSequence_content,
+        
+        e.outSequence AS outSequence_name,
+        CASE 
+            WHEN e.outSequence IS NOT NULL AND osl.seq_content_id IS NOT NULL 
+                THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 1))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 2001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 4001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 6001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 8001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_out.reg_content_data, 2000, 10001)))
+            WHEN e.outSequence IS NOT NULL 
+                THEN TO_CLOB('NOT FOUND')
+            ELSE TO_CLOB(NULL)
+        END AS outSequence_content,
+        
+        e.faultSequence AS faultSequence_name,
+        CASE 
+            WHEN e.faultSequence IS NOT NULL AND fsl.seq_content_id IS NOT NULL 
+                THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 1))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 2001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 4001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 6001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 8001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_flt.reg_content_data, 2000, 10001)))
+            WHEN e.faultSequence IS NOT NULL 
+                THEN TO_CLOB('NOT FOUND')
+            ELSE TO_CLOB(NULL)
+        END AS faultSequence_content,
+        
+        ipl.in_path_reg_name,
+        CASE 
+            WHEN ipl.in_path_content_id IS NOT NULL 
+                THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 1))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 2001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 4001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 6001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 8001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_ip.reg_content_data, 2000, 10001)))
+            ELSE TO_CLOB(NULL)
+        END AS inSequence_reg_path,
+        
+        opl.out_path_reg_name,
+        CASE 
+            WHEN opl.out_path_content_id IS NOT NULL 
+                THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 1))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 2001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 4001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 6001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 8001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_op.reg_content_data, 2000, 10001)))
+            ELSE TO_CLOB(NULL)
+        END AS outSequence_reg_path,
+        
+        fpl.fault_path_reg_name,
+        CASE 
+            WHEN fpl.fault_path_content_id IS NOT NULL 
+                THEN TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 1))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 2001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 4001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 6001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 8001))) ||
+                     TO_CLOB(UTL_RAW.CAST_TO_VARCHAR2(DBMS_LOB.SUBSTR(c_fp.reg_content_data, 2000, 10001)))
+            ELSE TO_CLOB(NULL)
+        END AS faultSequence_reg_path
+    
+    FROM extracted e
+    LEFT JOIN seq_latest isl ON isl.seq_name_clean = e.inSequence
+    LEFT JOIN coct42_reg.reg_content c_in ON c_in.reg_content_id = isl.seq_content_id
+    LEFT JOIN seq_latest osl ON osl.seq_name_clean = e.outSequence
+    LEFT JOIN coct42_reg.reg_content c_out ON c_out.reg_content_id = osl.seq_content_id
+    LEFT JOIN seq_latest fsl ON fsl.seq_name_clean = e.faultSequence
+    LEFT JOIN coct42_reg.reg_content c_flt ON c_flt.reg_content_id = fsl.seq_content_id
+    LEFT JOIN in_path_latest ipl ON ipl.API_UUID = e.API_UUID
+    LEFT JOIN coct42_reg.reg_content c_ip ON c_ip.reg_content_id = ipl.in_path_content_id
+    LEFT JOIN out_path_latest opl ON opl.API_UUID = e.API_UUID
+    LEFT JOIN coct42_reg.reg_content c_op ON c_op.reg_content_id = opl.out_path_content_id
+    LEFT JOIN fault_path_latest fpl ON fpl.API_UUID = e.API_UUID
+    LEFT JOIN coct42_reg.reg_content c_fp ON c_fp.reg_content_id = fpl.fault_path_content_id
+)
+SELECT 
+    b.API_NAME,
+    b.API_UUID,
+    b.API_VERSION,
+    b.CONTEXT,
+    b.ORGANIZATION,
+    b.reg_last_updated_time,
+    b.endpointConfig,
+    b.inSequence_name,
+    b.inSequence_content,
+    b.outSequence_name,
+    b.outSequence_content,
+    b.faultSequence_name,
+    b.faultSequence_content,
+    b.in_path_reg_name,
+    b.inSequence_reg_path,
+    b.out_path_reg_name,
+    b.outSequence_reg_path,
+    b.fault_path_reg_name,
+    b.faultSequence_reg_path,
+    
+    -- FoundSuspend
+    CASE 
+        WHEN INSTR(LOWER(b.endpointConfig), 'suspend') > 0
+          OR (b.inSequence_content IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'suspend') > 0)
+          OR (b.outSequence_content IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'suspend') > 0)
+          OR (b.faultSequence_content IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'suspend') > 0)
+          OR (b.inSequence_reg_path IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'suspend') > 0)
+          OR (b.outSequence_reg_path IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'suspend') > 0)
+          OR (b.faultSequence_reg_path IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'suspend') > 0)
+        THEN 'Yes'
+        ELSE 'No'
+    END AS FoundSuspend,
+    
+    -- SuspendFileName
+    TRIM(BOTH ',' FROM
+        CASE WHEN INSTR(LOWER(b.endpointConfig), 'suspend') > 0 THEN ',endpointConfig' ELSE '' END ||
+        CASE WHEN b.inSequence_content IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'suspend') > 0 
+             THEN ',inSequence_content(' || NVL(b.inSequence_name, 'N/A') || ')' ELSE '' END ||
+        CASE WHEN b.outSequence_content IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'suspend') > 0 
+             THEN ',outSequence_content(' || NVL(b.outSequence_name, 'N/A') || ')' ELSE '' END ||
+        CASE WHEN b.faultSequence_content IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'suspend') > 0 
+             THEN ',faultSequence_content(' || NVL(b.faultSequence_name, 'N/A') || ')' ELSE '' END ||
+        CASE WHEN b.inSequence_reg_path IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'suspend') > 0 
+             THEN ',inSequence_reg_path(' || NVL(b.in_path_reg_name, 'N/A') || ')' ELSE '' END ||
+        CASE WHEN b.outSequence_reg_path IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'suspend') > 0 
+             THEN ',outSequence_reg_path(' || NVL(b.out_path_reg_name, 'N/A') || ')' ELSE '' END ||
+        CASE WHEN b.faultSequence_reg_path IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'suspend') > 0 
+             THEN ',faultSequence_reg_path(' || NVL(b.fault_path_reg_name, 'N/A') || ')' ELSE '' END
+    ) AS SuspendFileName,
+    
+    -- FoundEndpoint (skip endpointConfig)
+    CASE 
+        WHEN (b.inSequence_content IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'endpoint') > 0)
+          OR (b.outSequence_content IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'endpoint') > 0)
+          OR (b.faultSequence_content IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'endpoint') > 0)
+          OR (b.inSequence_reg_path IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'endpoint') > 0)
+          OR (b.outSequence_reg_path IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'endpoint') > 0)
+          OR (b.faultSequence_reg_path IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'endpoint') > 0)
+        THEN 'Yes'
+        ELSE 'No'
+    END AS FoundEndpoint,
+    
+    -- EndpointFileName (skip endpointConfig)
+    TRIM(BOTH ',' FROM
+        CASE WHEN b.inSequence_content IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'endpoint') > 0 
+             THEN ',inSequence_content(' || NVL(b.inSequence_name, 'N/A') || ')' ELSE '' END ||
+        CASE WHEN b.outSequence_content IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'endpoint') > 0 
+             THEN ',outSequence_content(' || NVL(b.outSequence_name, 'N/A') || ')' ELSE '' END ||
+        CASE WHEN b.faultSequence_content IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'endpoint') > 0 
+             THEN ',faultSequence_content(' || NVL(b.faultSequence_name, 'N/A') || ')' ELSE '' END ||
+        CASE WHEN b.inSequence_reg_path IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'endpoint') > 0 
+             THEN ',inSequence_reg_path(' || NVL(b.in_path_reg_name, 'N/A') || ')' ELSE '' END ||
+        CASE WHEN b.outSequence_reg_path IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'endpoint') > 0 
+             THEN ',outSequence_reg_path(' || NVL(b.out_path_reg_name, 'N/A') || ')' ELSE '' END ||
+        CASE WHEN b.faultSequence_reg_path IS NOT NULL AND DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'endpoint') > 0 
+             THEN ',faultSequence_reg_path(' || NVL(b.fault_path_reg_name, 'N/A') || ')' ELSE '' END
+    ) AS EndpointFileName,
+    
+-- SuspensionStatus
+CASE 
+        -- Condition 1: suspendDuration IS PRESENT but empty/0 AND actionDuration NOT defined
+        WHEN INSTR(b.endpointConfig, '"suspendDuration"') > 0
+        AND (
+            INSTR(b.endpointConfig, '"suspendDuration":""') > 0
+            OR INSTR(b.endpointConfig, '"suspendDuration":"0"') > 0
+        )
+        AND INSTR(b.endpointConfig, '"actionDuration"') = 0
+        THEN 'SuspensionDisabled - Endpoint will timeout at 179000ms'
+        
+        -- Condition 2: suspendDuration IS PRESENT but empty/0 AND actionDuration IS defined
+        WHEN INSTR(b.endpointConfig, '"suspendDuration"') > 0
+        AND (
+            INSTR(b.endpointConfig, '"suspendDuration":""') > 0
+            OR INSTR(b.endpointConfig, '"suspendDuration":"0"') > 0
+        )
+        AND INSTR(b.endpointConfig, '"actionDuration"') > 0
+        THEN 'SuspensionDisabled - Endpoint will timeout based on actionDuration'
+        
+-- Condition 5: FoundSuspend=Yes BUT NOT in endpointConfig AND inSequence_content has <initailDuration>0</initailDuration>
+        WHEN INSTR(LOWER(NVL(b.endpointConfig, ' ')), 'suspend') = 0
+        AND (
+            (b.inSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'suspend'), 0) > 0)
+            OR (b.outSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'suspend'), 0) > 0)
+            OR (b.faultSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'suspend'), 0) > 0)
+            OR (b.inSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'suspend'), 0) > 0)
+            OR (b.outSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'suspend'), 0) > 0)
+            OR (b.faultSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'suspend'), 0) > 0)
+        )
+        AND (
+            (b.inSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.inSequence_content, '<initailDuration>0</initailDuration>'), 0) > 0)
+            OR (b.outSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.outSequence_content, '<initailDuration>0</initailDuration>'), 0) > 0)
+            OR (b.faultSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.faultSequence_content, '<initailDuration>0</initailDuration>'), 0) > 0)
+            OR (b.inSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.inSequence_reg_path, '<initailDuration>0</initailDuration>'), 0) > 0)
+            OR (b.outSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.outSequence_reg_path, '<initailDuration>0</initailDuration>'), 0) > 0)
+            OR (b.faultSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(b.faultSequence_reg_path, '<initailDuration>0</initailDuration>'), 0) > 0)
+        )
+        THEN 'ManualCheckRequiredInSequenceFile'
+        
+        -- Condition 3: FoundSuspend=No AND FoundEndpoint=No
+        WHEN INSTR(LOWER(NVL(b.endpointConfig, ' ')), 'suspend') = 0
+          AND (b.inSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'suspend'), 0) = 0)
+          AND (b.outSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'suspend'), 0) = 0)
+          AND (b.faultSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'suspend'), 0) = 0)
+          AND (b.inSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'suspend'), 0) = 0)
+          AND (b.outSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'suspend'), 0) = 0)
+          AND (b.faultSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'suspend'), 0) = 0)
+          AND (b.inSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'endpoint'), 0) = 0)
+          AND (b.outSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'endpoint'), 0) = 0)
+          AND (b.faultSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'endpoint'), 0) = 0)
+          AND (b.inSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'endpoint'), 0) = 0)
+          AND (b.outSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'endpoint'), 0) = 0)
+          AND (b.faultSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'endpoint'), 0) = 0)
+        THEN 'NoSuspensionDefined - Endpoint will timeout at synapse.global_timeout_interval=120000'
+        
+        -- Condition 4: FoundSuspend=No AND FoundEndpoint=Yes
+        WHEN INSTR(LOWER(NVL(b.endpointConfig, ' ')), 'suspend') = 0
+          AND (b.inSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'suspend'), 0) = 0)
+          AND (b.outSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'suspend'), 0) = 0)
+          AND (b.faultSequence_content IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'suspend'), 0) = 0)
+          AND (b.inSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'suspend'), 0) = 0)
+          AND (b.outSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'suspend'), 0) = 0)
+          AND (b.faultSequence_reg_path IS NULL OR NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'suspend'), 0) = 0)
+          AND (
+            (b.inSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_content), 'endpoint'), 0) > 0)
+            OR (b.outSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_content), 'endpoint'), 0) > 0)
+            OR (b.faultSequence_content IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_content), 'endpoint'), 0) > 0)
+            OR (b.inSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.inSequence_reg_path), 'endpoint'), 0) > 0)
+            OR (b.outSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.outSequence_reg_path), 'endpoint'), 0) > 0)
+            OR (b.faultSequence_reg_path IS NOT NULL AND NVL(DBMS_LOB.INSTR(LOWER(b.faultSequence_reg_path), 'endpoint'), 0) > 0)
+          )
+        THEN 'ManualCheckRequiredInEndpointXML'
+        
+ELSE NULL
+    END AS SuspensionStatus,
+    
+    -- actionDuration value extracted
+    CASE 
+        WHEN INSTR(b.endpointConfig, '"actionDuration":"') > 0
+        THEN SUBSTR(
+            b.endpointConfig,
+            INSTR(b.endpointConfig, '"actionDuration":"') + 18,
+            INSTR(b.endpointConfig, '"', INSTR(b.endpointConfig, '"actionDuration":"') + 18) 
+            - (INSTR(b.endpointConfig, '"actionDuration":"') + 18)
+        )
+        ELSE NULL
+    END AS actionDuration_value
 
-synapse.rest.CORSConfig.enabled=false
-synapse.carbon.ext.tenant.info=org.wso2.carbon.mediation.initializer.handler.CarbonTenantInfoConfigurator
-synapse.sal.endpoints.sesssion.timeout.default=600000
-synapse.carbon.ext.tenant.info.initiator=org.wso2.carbon.mediation.initializer.handler.CarbonTenantInfoInitiator
-synapse.main.xml.location=repository/resources/apim-synapse-config/main.xml
-synapse.fault.xml.location=repository/resources/apim-synapse-config/fault.xml
-limit_java_class_access_in_scripts.class_prefixes=java.nio.file
-limit_java_class_access_in_scripts.enable=true
-synapse.observers=org.wso2.carbon.mediation.dependency.mgt.DependencyTracker
-inbound.port.offset.enable=true
-synapse.temp_data.chunk.size=3072
-synapse.xpath.dom.failover.enabled=true
-limit_java_class_access_in_scripts.list_type=BLOCK_LIST
-synapse.registry.xml.location=repository/resources/apim-synapse-config/registry.xml
-synapse.xpath.func.extensions=org.wso2.carbon.mediation.security.vault.xpath.SecureVaultLookupXPathFunctionProvider
-synapse.global_timeout_interval=120000
-statistics.clean.enable=false
-synapse.artifacts.file.storage.enabled=false
+FROM base_data b
+ORDER BY b.reg_last_updated_time DESC;
