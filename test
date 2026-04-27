@@ -1,39 +1,13 @@
-Create a decision flow diagram for WSO2 API suspension logic with the following cases:
-
-Case 1: No Suspension Defined
-- Condition: "suspend" keyword not found in endpointConfig, inSequence, outSequence, faultSequence, or custom sequence files
-- Suspension Duration: 30 seconds (default)
-- Timeout Value: 120000ms (synapse.global_timeout_interval)
-- Status: Default suspension applies
-
-Case 2: Suspension Enabled (suspendDuration defined)
-- Condition: suspendDuration is set and not empty/not "0" in endpointConfig
-- Suspension Duration: suspendDuration value
-- Timeout Value: suspendDuration value
-- Status: Custom suspension applies
-
-Case 3: Suspension Disabled with actionDuration Override
+Case: Suspension Disabled with actionDuration Override
 - Condition: suspendDuration is empty or "0" AND actionDuration is defined
 - Suspension Duration: Disabled
 - Timeout Value: actionDuration value
 - Status: Uses action duration override
 
-Case 4: Suspension Disabled without actionDuration
-- Condition: suspendDuration is empty or "0" AND actionDuration not defined
-- Suspension Duration: Disabled
-- Timeout Value: 120000ms (synapse.global_timeout_interval)
-- Status: Falls back to global default
+{"endpoint_type":"default","sandbox_endpoints":{"template_not_supported":false,"url":"default"},"production_endpoints":{"endpoint_type":"default","template_not_supported":false,"config":{"suspendDuration":"0","suspendErrorCode":"101503","actionDuration":"60000","factor":"0.0","suspendMaxDuration":"0","actionSelect":"fault"},"url":"default"}}
 
-Case 5: Suspension Enabled with actionDuration (actionDuration ignored)
-- Condition: suspendDuration is set AND actionDuration is defined
-- Suspension Duration: suspendDuration value
-- Timeout Value: suspendDuration value (actionDuration is ignored)
-- Status: suspendDuration takes priority
+"suspendDuration":""
+"suspendDuration":"0"
 
-Case 6: Custom Sequence File (Manual Review Required)
-- Condition: "suspend" or "endpoint" keyword found in inSequence, outSequence, or faultSequence files
-- Suspension Duration: Defined in custom XML (check for initailDuration)
-- Timeout Value: Requires manual inspection of custom sequence files
-- Status: Manual check required - timeout depends on custom XML configuration
-
-Create a flowchart showing the decision tree for determining which case applies, with clear paths for each outcome and the corresponding timeout values. Use color coding to distinguish between default behavior (gray), enabled suspension (green), disabled suspension (red/pink), and custom sequence files (purple).
+"actionDuration":"60000"
+"actionDuration":"90000" or anything
